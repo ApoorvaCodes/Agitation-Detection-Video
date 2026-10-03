@@ -1,0 +1,382 @@
+{
+  "$defs": {
+    "BehaviourEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "behaviour": {
+          "title": "Behaviour",
+          "type": "string"
+        },
+        "start_timestamp": {
+          "minimum": 0,
+          "title": "Start Timestamp",
+          "type": "number"
+        },
+        "end_timestamp": {
+          "minimum": 0,
+          "title": "End Timestamp",
+          "type": "number"
+        },
+        "peak_similarity": {
+          "maximum": 1,
+          "minimum": -1,
+          "title": "Peak Similarity",
+          "type": "number"
+        },
+        "chunk_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Chunk Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "behaviour",
+        "start_timestamp",
+        "end_timestamp",
+        "peak_similarity",
+        "chunk_ids"
+      ],
+      "title": "BehaviourEvent",
+      "type": "object"
+    },
+    "BehaviourScore": {
+      "additionalProperties": false,
+      "properties": {
+        "behaviour": {
+          "title": "Behaviour",
+          "type": "string"
+        },
+        "similarity": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Similarity"
+        },
+        "smoothed_similarity": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Smoothed Similarity"
+        },
+        "shared_fraction": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Shared Fraction",
+          "type": "number"
+        },
+        "candidate": {
+          "default": false,
+          "title": "Candidate",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "behaviour",
+        "shared_fraction"
+      ],
+      "title": "BehaviourScore",
+      "type": "object"
+    },
+    "ChunkResult": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk_id": {
+          "title": "Chunk Id",
+          "type": "string"
+        },
+        "segment_id": {
+          "title": "Segment Id",
+          "type": "integer"
+        },
+        "start_timestamp": {
+          "minimum": 0,
+          "title": "Start Timestamp",
+          "type": "number"
+        },
+        "end_timestamp": {
+          "minimum": 0,
+          "title": "End Timestamp",
+          "type": "number"
+        },
+        "frame_indices": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Frame Indices",
+          "type": "array"
+        },
+        "valid_fraction": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Valid Fraction",
+          "type": "number"
+        },
+        "status": {
+          "enum": [
+            "scored",
+            "low_quality",
+            "no_prototypes",
+            "insufficient_evidence"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "embeddings": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Embedding"
+          },
+          "title": "Embeddings",
+          "type": "object"
+        },
+        "fused_embedding": {
+          "$ref": "#/$defs/Embedding"
+        },
+        "motion_features": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Motion Features",
+          "type": "object"
+        },
+        "scores": {
+          "items": {
+            "$ref": "#/$defs/BehaviourScore"
+          },
+          "title": "Scores",
+          "type": "array"
+        }
+      },
+      "required": [
+        "chunk_id",
+        "segment_id",
+        "start_timestamp",
+        "end_timestamp",
+        "frame_indices",
+        "valid_fraction",
+        "status",
+        "embeddings",
+        "fused_embedding",
+        "motion_features",
+        "scores"
+      ],
+      "title": "ChunkResult",
+      "type": "object"
+    },
+    "Embedding": {
+      "additionalProperties": false,
+      "properties": {
+        "space": {
+          "title": "Space",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Values",
+          "type": "array"
+        },
+        "valid": {
+          "items": {
+            "type": "boolean"
+          },
+          "title": "Valid",
+          "type": "array"
+        }
+      },
+      "required": [
+        "space",
+        "values",
+        "valid"
+      ],
+      "title": "Embedding",
+      "type": "object"
+    },
+    "Person2Config": {
+      "properties": {
+        "window_seconds": {
+          "default": 2.0,
+          "title": "Window Seconds",
+          "type": "number"
+        },
+        "overlap": {
+          "default": 0.5,
+          "title": "Overlap",
+          "type": "number"
+        },
+        "max_gap_seconds": {
+          "default": 1.0,
+          "title": "Max Gap Seconds",
+          "type": "number"
+        },
+        "min_frames": {
+          "default": 3,
+          "title": "Min Frames",
+          "type": "integer"
+        },
+        "min_valid_fraction": {
+          "default": 0.6,
+          "title": "Min Valid Fraction",
+          "type": "number"
+        },
+        "min_shared_fraction": {
+          "default": 0.5,
+          "title": "Min Shared Fraction",
+          "type": "number"
+        },
+        "similarity_threshold": {
+          "default": 0.8,
+          "title": "Similarity Threshold",
+          "type": "number"
+        },
+        "smoothing_alpha": {
+          "default": 0.5,
+          "title": "Smoothing Alpha",
+          "type": "number"
+        },
+        "min_event_seconds": {
+          "default": 1.0,
+          "title": "Min Event Seconds",
+          "type": "number"
+        },
+        "pose_weight": {
+          "default": 1.0,
+          "title": "Pose Weight",
+          "type": "number"
+        },
+        "motion_weight": {
+          "default": 1.0,
+          "title": "Motion Weight",
+          "type": "number"
+        },
+        "video_weight": {
+          "default": 1.0,
+          "title": "Video Weight",
+          "type": "number"
+        }
+      },
+      "title": "Person2Config",
+      "type": "object"
+    },
+    "PersonResult": {
+      "additionalProperties": false,
+      "properties": {
+        "person_id": {
+          "title": "Person Id",
+          "type": "string"
+        },
+        "chunks": {
+          "items": {
+            "$ref": "#/$defs/ChunkResult"
+          },
+          "title": "Chunks",
+          "type": "array"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/BehaviourEvent"
+          },
+          "title": "Events",
+          "type": "array"
+        }
+      },
+      "required": [
+        "person_id",
+        "chunks",
+        "events"
+      ],
+      "title": "PersonResult",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Source Schema Version",
+      "type": "string"
+    },
+    "video_id": {
+      "title": "Video Id",
+      "type": "string"
+    },
+    "score_semantics": {
+      "const": "uncalibrated_cosine_similarity",
+      "default": "uncalibrated_cosine_similarity",
+      "title": "Score Semantics",
+      "type": "string"
+    },
+    "configuration": {
+      "$ref": "#/$defs/Person2Config"
+    },
+    "embedding_spaces": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Embedding Spaces",
+      "type": "object"
+    },
+    "prototype_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Prototype Version"
+    },
+    "persons": {
+      "items": {
+        "$ref": "#/$defs/PersonResult"
+      },
+      "title": "Persons",
+      "type": "array"
+    }
+  },
+  "required": [
+    "video_id",
+    "configuration",
+    "embedding_spaces",
+    "prototype_version",
+    "persons"
+  ],
+  "title": "Person2VideoResult",
+  "type": "object"
+}

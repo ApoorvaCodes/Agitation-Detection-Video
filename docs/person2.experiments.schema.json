@@ -1,0 +1,141 @@
+{
+  "$defs": {
+    "DatasetProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "annotation_protocol": {
+          "minLength": 1,
+          "title": "Annotation Protocol",
+          "type": "string"
+        },
+        "annotation_version": {
+          "minLength": 1,
+          "title": "Annotation Version",
+          "type": "string"
+        },
+        "license_or_permission": {
+          "minLength": 1,
+          "title": "License Or Permission",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "annotation_protocol",
+        "annotation_version",
+        "license_or_permission"
+      ],
+      "title": "DatasetProvenance",
+      "type": "object"
+    },
+    "LabelledChunk": {
+      "additionalProperties": false,
+      "properties": {
+        "perception": {
+          "minLength": 1,
+          "title": "Perception",
+          "type": "string"
+        },
+        "person_id": {
+          "minLength": 1,
+          "title": "Person Id",
+          "type": "string"
+        },
+        "chunk_id": {
+          "minLength": 1,
+          "title": "Chunk Id",
+          "type": "string"
+        },
+        "subject_id": {
+          "minLength": 1,
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "annotation_id": {
+          "minLength": 1,
+          "title": "Annotation Id",
+          "type": "string"
+        },
+        "split": {
+          "enum": [
+            "train",
+            "validation",
+            "test"
+          ],
+          "title": "Split",
+          "type": "string"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Labels",
+          "type": "array"
+        }
+      },
+      "required": [
+        "perception",
+        "person_id",
+        "chunk_id",
+        "subject_id",
+        "session_id",
+        "annotation_id",
+        "split",
+        "labels"
+      ],
+      "title": "LabelledChunk",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "provenance": {
+      "$ref": "#/$defs/DatasetProvenance"
+    },
+    "behaviours": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Behaviours",
+      "type": "array"
+    },
+    "records": {
+      "items": {
+        "$ref": "#/$defs/LabelledChunk"
+      },
+      "minItems": 1,
+      "title": "Records",
+      "type": "array"
+    }
+  },
+  "required": [
+    "provenance",
+    "behaviours",
+    "records"
+  ],
+  "title": "ExperimentManifest",
+  "type": "object"
+}

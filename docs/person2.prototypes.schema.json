@@ -1,0 +1,86 @@
+{
+  "$defs": {
+    "Embedding": {
+      "additionalProperties": false,
+      "properties": {
+        "space": {
+          "title": "Space",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Values",
+          "type": "array"
+        },
+        "valid": {
+          "items": {
+            "type": "boolean"
+          },
+          "title": "Valid",
+          "type": "array"
+        }
+      },
+      "required": [
+        "space",
+        "values",
+        "valid"
+      ],
+      "title": "Embedding",
+      "type": "object"
+    },
+    "Prototype": {
+      "additionalProperties": false,
+      "properties": {
+        "behaviour": {
+          "minLength": 1,
+          "title": "Behaviour",
+          "type": "string"
+        },
+        "embedding": {
+          "$ref": "#/$defs/Embedding"
+        },
+        "example_count": {
+          "minimum": 1,
+          "title": "Example Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "behaviour",
+        "embedding",
+        "example_count"
+      ],
+      "title": "Prototype",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "version": {
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    },
+    "prototypes": {
+      "items": {
+        "$ref": "#/$defs/Prototype"
+      },
+      "title": "Prototypes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "version",
+    "prototypes"
+  ],
+  "title": "PrototypeBank",
+  "type": "object"
+}

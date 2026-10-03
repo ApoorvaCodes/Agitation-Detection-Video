@@ -1,4 +1,46 @@
-# Person 1: video perception
+# Video perception and temporal behaviour evidence
+
+This repository contains Person 1 video perception and the Person 2 temporal
+embedding/prototype baseline on the `person-2` branch.
+
+## Person 2: embeddings and temporal ML baseline
+
+Person 2 consumes the existing perception JSON and produces a versioned evidence
+handoff for Person 3. It includes gap-aware overlapping chunks, masked pose and
+motion descriptors, optional local video crop embeddings, labelled exemplar
+prototype building, cosine similarity, temporal smoothing, and candidate events.
+
+```sh
+pip install -e '.[test]'
+python -m person2.cli run --input result.perception.json --config configs/person2.json --output result.behaviours.json
+python -m person2.cli validate result.behaviours.json
+```
+
+Without labelled prototypes the pipeline extracts descriptors and returns
+`no_prototypes`. Supply `--prototypes prototypes.json` to score candidate
+behaviours. `--video source.mp4` enables the RGB crop histogram baseline; a
+learned encoder can be injected through the Python API. No trained action model
+or clinically validated detector is bundled. Scores are uncalibrated similarities.
+See [the Person 2 → Person 3 contract](docs/PERSON2_CONTRACT.md) for the prototype
+annotation workflow, embedding ordering, quality gates, and JSON field meanings.
+Encoder identities are written to an `OUTPUT.encoders.json` sidecar while the
+handoff remains schema `1.0`. Use `--pose-representation time-bins` for ordered
+pose bins or `--video-encoder encoder.json` for a configured local encoder.
+
+The [experiment workflow](docs/PERSON2_EXPERIMENTS.md) compares pose-only,
+motion-only, pose-plus-motion, and temporal pose-plus-motion using explicit
+person/session-disjoint annotations. Run a readiness report with:
+
+```sh
+PYTHONPATH=src .venv/bin/python -m person2.cli experiment --output-dir experiments/person2-readiness
+```
+
+No labelled research dataset is available in this repository; empirical model
+selection remains pending. The readiness report contains null metrics.
+The experiment documentation includes tested dependency pins and the source-path
+setup needed if editable installation does not expose `src` in your environment.
+
+## Person 1: video perception
 
 This repository implements the video-only perception stage of a CMAI research pipeline. It measures detections, session-local tracks, pose, normalized landmarks, and motion evidence. It deliberately does **not** classify CMAI behaviours, infer clinical probabilities, or call a cloud service.
 
