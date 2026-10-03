@@ -2,6 +2,7 @@ __pycache__/
 .pytest_cache/
 *.py[cod]
 .venv/
+*.egg-info/
 *.mp4
 *.mov
 *.avi

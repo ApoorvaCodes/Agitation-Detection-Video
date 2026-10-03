@@ -1,0 +1,258 @@
+"""Reproducible, explicitly labelled, subject/session-disjoint ablations.
+
+No dataset is downloaded or labelled here. Synthetic unit fixtures are never
+used as empirical evidence. Threshold selection uses validation only.
+"""
+from dataclasses import asdict, replace
+from hashlib import sha256
+from importlib.metadata import version
+import json
+from pathlib import Path
+import platform
+from typing import Literal
+
+from pydantic import Field, model_validator
+
+from person1.io import load_perception
+from person2.config import Person2Config
+from person2.contracts import Contract
+from person2.embeddings import TemporalPoseEncoder, encoder_metadata
+from person2.io import save_prototypes
+from person2.pipeline import process_perception
+from person2.prototypes import build_prototypes
+
+
+class DatasetProvenance(Contract):
+    name: str = Field(min_length=1)
+    source: str = Field(min_length=1)
+    annotation_protocol: str = Field(min_length=1)
+    annotation_version: str = Field(min_length=1)
+    license_or_permission: str = Field(min_length=1)
+
+
+class LabelledChunk(Contract):
+    perception: str = Field(min_length=1)
+    person_id: str = Field(min_length=1)
+    chunk_id: str = Field(min_length=1)
+    subject_id: str = Field(min_length=1)
+    session_id: str = Field(min_length=1)
+    annotation_id: str = Field(min_length=1)
+    split: Literal["train", "validation", "test"]
+    # Required even when empty: [] explicitly denotes an annotated negative.
+    labels: list[str]
+
+
+class ExperimentManifest(Contract):
+    schema_version: Literal["1.0"] = "1.0"
+    provenance: DatasetProvenance
+    behaviours: list[str] = Field(min_length=1)
+    records: list[LabelledChunk] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_labels(self):
+        if len(self.behaviours) != len(set(self.behaviours)) or any(not b.strip() for b in self.behaviours):
+            raise ValueError("behaviours must be unique nonempty labels")
+        for record in self.records:
+            if len(record.labels) != len(set(record.labels)) or not set(record.labels) <= set(self.behaviours):
+                raise ValueError("record labels must be unique and belong to behaviours")
+        if {r.split for r in self.records} != {"train", "validation", "test"}:
+            raise ValueError("manifest needs train, validation, and test records")
+        return self
+
+
+def content_hash(path):
+    return sha256(Path(path).read_bytes()).hexdigest()
+
+
+def runtime_metadata():
+    package = Path(__file__).parent
+    return {"python": platform.python_version(), "platform": platform.platform(),
+            "dependencies": {name: version(name) for name in ("numpy", "pydantic", "opencv-python", "pydantic-core",
+                                                               "annotated-types", "typing-extensions", "typing-inspection")},
+            "code_sha256": {f"{p.parent.name}/{p.name}": content_hash(p)
+                            for p in sorted(package.parent.glob("person[12]/*.py"))}}
+
+
+def validate_split_integrity(manifest, base):
+    """Global subjects, sessions, source videos and identical files cannot leak."""
+    partition = {name: {} for name in ("subject", "session", "file", "video")}
+    track_subjects, seen, hashes, sources, sessions = {}, set(), {}, {}, {}
+    audit = []
+    for record in manifest.records:
+        path = (base / record.perception).resolve()
+        if path not in sources:
+            hashes[path] = content_hash(path)
+            sources[path] = load_perception(path)
+        video = sources[path].video.video_id
+        if video in sessions and sessions[video] != record.session_id:
+            raise ValueError("one source video cannot have conflicting session IDs")
+        sessions[video] = record.session_id
+        key = (hashes[path], record.person_id, record.chunk_id)
+        if key in seen:
+            raise ValueError("duplicate annotated chunk")
+        seen.add(key)
+        track = (hashes[path], record.person_id)
+        if track in track_subjects and track_subjects[track] != record.subject_id:
+            raise ValueError("one source track cannot have conflicting subject IDs")
+        track_subjects[track] = record.subject_id
+        for kind, value in (("subject", record.subject_id), ("session", record.session_id),
+                            ("file", hashes[path]), ("video", video)):
+            old = partition[kind].get(value)
+            if old is not None and old != record.split:
+                raise ValueError(f"{kind} leakage across splits: {value}")
+            partition[kind][value] = record.split
+        audit.append({**record.model_dump(), "perception_sha256": hashes[path], "video_id": video})
+    return sources, audit
+
+
+def chunk_for(result, record):
+    matches = [c for p in result.persons if p.person_id == record.person_id
+               for c in p.chunks if c.chunk_id == record.chunk_id]
+    if len(matches) != 1:
+        raise ValueError(f"annotated chunk does not exist: {record.perception} {record.chunk_id}")
+    return matches[0]
+
+
+def evaluate(rows, behaviours):
+    """Chunk multilabel metrics; abstained positives count as missed evidence.
+
+    Abstained negatives are not true negatives. Coverage makes missing evidence
+    visible rather than inflating conditional accuracy. No probabilities/AUROC.
+    """
+    counts = {b: {k: 0 for k in ("tp", "fp", "fn", "tn", "abstained_positive", "abstained_negative")}
+              for b in behaviours}
+    predictions = []
+    for record, chunk in rows:
+        available = {s.behaviour: s for s in chunk.scores} if chunk.status == "scored" else {}
+        predicted, abstained = [], []
+        for b in behaviours:
+            positive = b in record.labels
+            score = available.get(b)
+            c = counts[b]
+            if score is None or score.similarity is None:
+                c["abstained_positive" if positive else "abstained_negative"] += 1
+                if positive:
+                    c["fn"] += 1
+                abstained.append(b)
+            elif score.candidate:
+                c["tp" if positive else "fp"] += 1
+                predicted.append(b)
+            else:
+                c["fn" if positive else "tn"] += 1
+        predictions.append({"perception": record.perception, "chunk_id": record.chunk_id,
+                            "annotation_id": record.annotation_id, "truth": record.labels,
+                            "candidates": predicted, "abstained": abstained, "status": chunk.status,
+                            "scores": [s.model_dump() for s in chunk.scores]})
+
+    def derived(c, total):
+        tp, fp, fn = c["tp"], c["fp"], c["fn"]
+        return {**c, "precision": tp / (tp + fp) if tp + fp else None,
+                "recall": tp / (tp + fn) if tp + fn else None,
+                "f1": 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn else None,
+                "coverage": 1 - (c["abstained_positive"] + c["abstained_negative"]) / total if total else None}
+
+    per_label = {b: derived(c, len(rows)) for b, c in counts.items()}
+    micro = derived({k: sum(c[k] for c in counts.values()) for k in next(iter(counts.values()))},
+                    len(rows) * len(behaviours))
+    f1s = [m["f1"] for m in per_label.values() if m["f1"] is not None]
+    return {"annotated_chunks": len(rows), "per_label": per_label, "micro": micro,
+            "macro_f1": sum(f1s) / len(f1s) if f1s else None,
+            "macro_f1_labels": len(f1s)}, predictions
+
+
+def experiment_variants(config, temporal_bins):
+    return [
+        ("pose_only", replace(config, pose_weight=1, motion_weight=0, video_weight=0), None),
+        ("motion_only", replace(config, pose_weight=0, motion_weight=1, video_weight=0), None),
+        ("pose_plus_motion", replace(config, pose_weight=1, motion_weight=1, video_weight=0), None),
+        ("temporal_pose_plus_motion", replace(config, pose_weight=1, motion_weight=1, video_weight=0),
+         TemporalPoseEncoder(config.window_seconds, temporal_bins)),
+    ]
+
+
+LIMITATIONS = [
+    "No clinical validation, calibrated probability, or claim of a best model.",
+    "Chunk metrics assess annotated candidate support, not verified clinical behaviour or event localization.",
+    "Overlapping chunks are correlated; bootstrap confidence intervals are not estimated.",
+    "Subject/session IDs and annotation provenance are supplied by the dataset owner and must be audited.",
+    "Prototypes and temporal bins are engineering baselines, not pretrained or trained deep action models.",
+    "Model selection remains provisional until representative data and independent replication are available.",
+]
+
+
+def run_experiments(manifest_path, output_dir, config=None, thresholds=(.6, .7, .8, .9), temporal_bins=4):
+    config = config or Person2Config()
+    variants = experiment_variants(config, temporal_bins)
+    thresholds = sorted(set(thresholds))
+    if not thresholds or any(not -1 <= t <= 1 for t in thresholds):
+        raise ValueError("threshold grid must contain finite values in [-1,1]")
+    report = {"schema_version": "1.0", "status": "pending_labelled_data", "runtime": runtime_metadata(),
+              "base_configuration": asdict(config), "threshold_grid": thresholds,
+              "variants": {name: {"configuration": asdict(cfg), "pose_identity":
+                                   (encoder.identity if encoder else {"model": "pose_stats", "version": "1"}),
+                                   "metrics": None} for name, cfg, encoder in variants},
+              "limitations": LIMITATIONS, "selection": None}
+    output_dir = Path(output_dir)
+    if manifest_path is None:
+        report["reason"] = "No labelled manifest supplied. No training, evaluation, or model ranking performed."
+    else:
+        manifest_path = Path(manifest_path)
+        manifest = ExperimentManifest.model_validate_json(manifest_path.read_text())
+        sources, audit = validate_split_integrity(manifest, manifest_path.parent)
+        report.update({"status": "evaluated", "dataset_provenance": manifest.provenance.model_dump(),
+                       "manifest_sha256": content_hash(manifest_path), "split_audit": audit,
+                       "behaviours": manifest.behaviours})
+        output_dir.mkdir(parents=True, exist_ok=True)
+        for name, cfg, encoder in variants:
+            extracted = {p: process_perception(source, cfg, pose_encoder=encoder) for p, source in sources.items()}
+            examples = []
+            unusable = []
+            # Labels in validation/test never contribute to prototype construction.
+            for record in manifest.records:
+                chunk = chunk_for(extracted[(manifest_path.parent / record.perception).resolve()], record)
+                if record.split == "train":
+                    if chunk.status == "low_quality" or not any(chunk.fused_embedding.valid):
+                        unusable.append(record.annotation_id)
+                    else:
+                        examples.extend((label, chunk.fused_embedding) for label in record.labels)
+            if {label for label, _ in examples} != set(manifest.behaviours):
+                report["variants"][name].update({"status": "pending_usable_training_examples",
+                                                "unusable_training_annotations": unusable})
+                continue
+            bank = build_prototypes(examples, f"{manifest.provenance.annotation_version}:{name}")
+            save_prototypes(bank, output_dir / f"{name}.prototypes.json")
+
+            def infer(split, threshold):
+                paths = {(manifest_path.parent / r.perception).resolve() for r in manifest.records if r.split == split}
+                results = {p: process_perception(sources[p], replace(cfg, similarity_threshold=threshold),
+                                                 prototypes=bank, pose_encoder=encoder) for p in sorted(paths)}
+                rows = [(r, chunk_for(results[(manifest_path.parent / r.perception).resolve()], r))
+                        for r in manifest.records if r.split == split]
+                return evaluate(rows, manifest.behaviours)
+
+            validation = [(t, *infer("validation", t)) for t in thresholds]
+            eligible = [(t, m, predictions) for t, m, predictions in validation
+                        if m["micro"]["f1"] is not None and m["micro"]["coverage"] > 0]
+            if not eligible:
+                report["variants"][name].update({"status": "pending_usable_validation_evidence",
+                                                "validation_grid": [{"threshold": t, "metrics": m} for t, m, _ in validation]})
+                continue
+            # Deterministic tie break favors the higher threshold; never inspect test to tune.
+            chosen, val_metrics, val_predictions = max(eligible, key=lambda item: (item[1]["micro"]["f1"], item[0]))
+            test_metrics, test_predictions = infer("test", chosen)
+            first = next(iter(extracted.values()))
+            report["variants"][name] = {"status": "evaluated", "configuration": asdict(replace(cfg, similarity_threshold=chosen)),
+                                         "encoder_metadata": encoder_metadata(first, encoder),
+                                         "selected_threshold": chosen, "threshold_selection_split": "validation",
+                                         "validation_grid": [{"threshold": t, "metrics": m} for t, m, _ in validation],
+                                         "metrics": {"validation": val_metrics, "test": test_metrics},
+                                         "predictions": {"validation": val_predictions, "test": test_predictions},
+                                         "prototype_file": f"{name}.prototypes.json",
+                                         "prototype_sha256": content_hash(output_dir / f"{name}.prototypes.json"),
+                                         "unusable_training_annotations": unusable}
+        if any(v.get("status") != "evaluated" for v in report["variants"].values()):
+            report["status"] = "incomplete_evaluation"
+        report["selection"] = "Comparison only; no automatic claim that any representation is best."
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "report.json").write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
+    return report

@@ -1,0 +1,160 @@
+{
+  "schema_version": "1.0",
+  "status": "pending_labelled_data",
+  "runtime": {
+    "python": "3.11.15",
+    "platform": "macOS-26.3-arm64-arm-64bit",
+    "dependencies": {
+      "numpy": "2.4.6",
+      "pydantic": "2.13.5",
+      "opencv-python": "5.0.0.93",
+      "pydantic-core": "2.46.5",
+      "annotated-types": "0.8.0",
+      "typing-extensions": "4.16.0",
+      "typing-inspection": "0.4.4"
+    },
+    "code_sha256": {
+      "person1/__init__.py": "9b677564b05aba5492f2ead217eb88689c2e3a157fad2c10e4562cc72f1d22b0",
+      "person1/cli.py": "28a79554e4b288fb5f76d9d5535a24607a5171bcf60d00ca20c4b8ae355190ae",
+      "person1/config.py": "e0df39ae283e28d34fae87774178774e9927760fed37026e24b9edba14700258",
+      "person1/contracts.py": "4af40e24d36631fe5b115936f6b4acb1ab6aafbbfe88f2df69eac3a1a3a1308c",
+      "person1/errors.py": "3b3a8e1d779e160ab3a98714b5da4d325ca07713e4db0f02b41a8095b0d1b6b7",
+      "person1/features.py": "2c2ef0b4bd8699aa57332b23b694a219aa4ba30b52d6a37676afb83a845e07f9",
+      "person1/ingestion.py": "ec7f32fde95ad1845b10714f004e5e339132bc8b3302a177a44f8f20dbb106f5",
+      "person1/io.py": "7e1f7d6ebdbe46d2081b19910883a056a6e71951ff58f0a379fd5defaf557982",
+      "person1/overlay.py": "c236f04cb0ede1f6a88e4bafe72875321a0e88e7e52485f860e041fb9c90c3fd",
+      "person1/perception.py": "b9d0537f26834837ffa3d14e0eaa79010a9199702d4642570ef57a51fc68095a",
+      "person1/pipeline.py": "36bdbbe31257d730c77d850ba1c1c25f3bc664f60fcface2be69ae54a09bb835",
+      "person1/tracking.py": "1cb00989a33eab803c4758db0143b09a8110adb595c34d8f6b873fad5074c2e0",
+      "person2/__init__.py": "ee9feb22842a39c2fbbfe88f3d822036a623a992f12daf735e4767743b5761bb",
+      "person2/chunking.py": "d9ab6cfa1500be4325c2777039b5ee21c006241920a75bfb670c5493c281e2ba",
+      "person2/cli.py": "b94ca85dbd0e968141d6842b7704de3d2b7009598465ff8c47bfc8ff07213e31",
+      "person2/config.py": "6855eb2eccb1fb644acabb15ad285f3c08cb33d260ac067bff2197de8a437bec",
+      "person2/contracts.py": "7cfd8cb1d4fe229a37b405cde529ec5e4b320033d68df630e930430b1488c2ee",
+      "person2/embeddings.py": "32e9bdc040e7a5d6bc4505105e3ada00e01b5c8dc59082a0270bf181bd5aeee9",
+      "person2/experiments.py": "5f2d2035df951f4b87f118a76c0f8b14de0162fc9b9d2e97f4dcae739b8506cc",
+      "person2/io.py": "5cff2c57d82769252eaf5666f77dc4e5df0f79ee0573e5887b14a8fd7c35be1d",
+      "person2/pipeline.py": "332417aa02adf1e10c9db084f279aade3a24726494379213f67f8606a9320681",
+      "person2/prototypes.py": "14b4d987e4bfd8a195682498283774d8a3d6487997c2692404ea71b05b1a03ed"
+    }
+  },
+  "base_configuration": {
+    "window_seconds": 2.0,
+    "overlap": 0.5,
+    "max_gap_seconds": 1.0,
+    "min_frames": 3,
+    "min_valid_fraction": 0.6,
+    "min_shared_fraction": 0.5,
+    "similarity_threshold": 0.8,
+    "smoothing_alpha": 0.5,
+    "min_event_seconds": 1.0,
+    "pose_weight": 1.0,
+    "motion_weight": 1.0,
+    "video_weight": 1.0
+  },
+  "threshold_grid": [
+    0.6,
+    0.7,
+    0.8,
+    0.9
+  ],
+  "variants": {
+    "pose_only": {
+      "configuration": {
+        "window_seconds": 2.0,
+        "overlap": 0.5,
+        "max_gap_seconds": 1.0,
+        "min_frames": 3,
+        "min_valid_fraction": 0.6,
+        "min_shared_fraction": 0.5,
+        "similarity_threshold": 0.8,
+        "smoothing_alpha": 0.5,
+        "min_event_seconds": 1.0,
+        "pose_weight": 1,
+        "motion_weight": 0,
+        "video_weight": 0
+      },
+      "pose_identity": {
+        "model": "pose_stats",
+        "version": "1"
+      },
+      "metrics": null
+    },
+    "motion_only": {
+      "configuration": {
+        "window_seconds": 2.0,
+        "overlap": 0.5,
+        "max_gap_seconds": 1.0,
+        "min_frames": 3,
+        "min_valid_fraction": 0.6,
+        "min_shared_fraction": 0.5,
+        "similarity_threshold": 0.8,
+        "smoothing_alpha": 0.5,
+        "min_event_seconds": 1.0,
+        "pose_weight": 0,
+        "motion_weight": 1,
+        "video_weight": 0
+      },
+      "pose_identity": {
+        "model": "pose_stats",
+        "version": "1"
+      },
+      "metrics": null
+    },
+    "pose_plus_motion": {
+      "configuration": {
+        "window_seconds": 2.0,
+        "overlap": 0.5,
+        "max_gap_seconds": 1.0,
+        "min_frames": 3,
+        "min_valid_fraction": 0.6,
+        "min_shared_fraction": 0.5,
+        "similarity_threshold": 0.8,
+        "smoothing_alpha": 0.5,
+        "min_event_seconds": 1.0,
+        "pose_weight": 1,
+        "motion_weight": 1,
+        "video_weight": 0
+      },
+      "pose_identity": {
+        "model": "pose_stats",
+        "version": "1"
+      },
+      "metrics": null
+    },
+    "temporal_pose_plus_motion": {
+      "configuration": {
+        "window_seconds": 2.0,
+        "overlap": 0.5,
+        "max_gap_seconds": 1.0,
+        "min_frames": 3,
+        "min_valid_fraction": 0.6,
+        "min_shared_fraction": 0.5,
+        "similarity_threshold": 0.8,
+        "smoothing_alpha": 0.5,
+        "min_event_seconds": 1.0,
+        "pose_weight": 1,
+        "motion_weight": 1,
+        "video_weight": 0
+      },
+      "pose_identity": {
+        "model": "pose_time_bins",
+        "version": "1",
+        "bins": 4,
+        "window_seconds": 2.0,
+        "preprocessing": "masked_means_no_interpolation"
+      },
+      "metrics": null
+    }
+  },
+  "limitations": [
+    "No clinical validation, calibrated probability, or claim of a best model.",
+    "Chunk metrics assess annotated candidate support, not verified clinical behaviour or event localization.",
+    "Overlapping chunks are correlated; bootstrap confidence intervals are not estimated.",
+    "Subject/session IDs and annotation provenance are supplied by the dataset owner and must be audited.",
+    "Prototypes and temporal bins are engineering baselines, not pretrained or trained deep action models.",
+    "Model selection remains provisional until representative data and independent replication are available."
+  ],
+  "selection": null,
+  "reason": "No labelled manifest supplied. No training, evaluation, or model ranking performed."
+}
