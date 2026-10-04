@@ -20,15 +20,21 @@ class PoseEstimator(Protocol):
 
 def runtime_diagnostics(model_name: str, tracker: str) -> dict[str, str]:
     """Return the runtime facts needed to diagnose model-loading failures."""
-    try:
-        version = importlib.metadata.version("ultralytics")
-    except importlib.metadata.PackageNotFoundError:
-        version = "not installed"
+    def package_version(name):
+        try:
+            return importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            return "not installed"
     return {
         "python_executable": sys.executable,
         "python_version": sys.version.split()[0],
+        "numpy_version": package_version("numpy"),
+        "opencv_version": package_version("opencv-python"),
+        "torch_version": package_version("torch"),
+        "torchvision_version": package_version("torchvision"),
         "ultralytics_importable": str(importlib.util.find_spec("ultralytics") is not None).lower(),
-        "ultralytics_version": version,
+        "ultralytics_version": package_version("ultralytics"),
+        "mediapipe_version": package_version("mediapipe"),
         "model": model_name,
         "tracker": tracker,
     }

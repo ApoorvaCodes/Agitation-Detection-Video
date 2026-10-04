@@ -9,7 +9,7 @@ remain pending. Synthetic tests verify algorithms and contracts only.
 
 ## Run immediately
 
-Use Python 3.11 and the existing environment. No Groq key is required for local
+Use Python 3.12 and the existing environment. No Groq key is required for local
 analysis; Groq remains an optional explicit machine review in the sidebar.
 
 ```sh

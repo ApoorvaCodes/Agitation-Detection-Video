@@ -19,5 +19,5 @@ def test_malformed_or_missing_fields_rejected():
 def test_remote_verifier_vocabulary_is_canonical_camera_ids():
     labels = canonical_verification_labels()
     assert labels[0] == "cmai_01_pacing_aimless_wandering"
-    assert len(labels) == 29
-    assert "Pushing" not in labels
+    assert "cmai_04_cursing_verbal_aggression" not in labels
+    assert "cmai_05_unwarranted_attention_help_requests" not in labels

@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "src"))
 import streamlit as st
 
 from person1.config import Person1Config
+from person1.perception import runtime_diagnostics
 from person2.contracts import PrototypeBank
 from person3.clips import candidate_reference_frame
 from person3.contracts import ValidationResult
@@ -22,7 +23,7 @@ from person3.pipeline import validate_p2_result
 from person3.qwen_validator import GroqQwenValidator
 from person3.supabase_store import SupabaseStore
 from cmai.bundle import load_bundle, research_override, legacy_result_bundle
-from cmai.taxonomy import load_taxonomy
+from cmai.taxonomy import camera_observable_ids, load_taxonomy
 from cmai.results import (build_camera_result, review_event, create_evidence, export_archive, attach_machine_reviews)
 from cmai.jobs import start_analysis
 from cmai.interactions import InteractionEvidence
@@ -32,12 +33,28 @@ def clear_results():
     job = st.session_state.pop("analysis_job", None)
     if job:
         job.cancel()
-    for name in ("p1", "p2", "events", "camera_result", "action_assessments", "active_bundle", "selected_person", "matching_video", "video_sha256", "analysis_message", "clip_path", "clip_event_id"):
+    for name in ("p1", "p2", "events", "camera_result", "action_assessments", "active_bundle", "selected_person", "matching_video", "video_sha256", "analysis_message", "clip_path", "clip_event_id", "verification_key", "verification_status", "verification_error"):
         st.session_state.pop(name, None)
     directory = st.session_state.pop("source_directory", None)
     if directory:
         directory.cleanup()
     st.session_state.pop("source_path", None)
+
+
+def automatic_verification(p1, p2, api_key, model, action_assessments=None):
+    """Run P3 only for actual P2 candidates; never create candidates here."""
+    candidate_count = sum(len(person.events) for person in p2.persons)
+    if candidate_count == 0:
+        return "no_candidates", [], None
+    if not api_key or not model.strip():
+        return "unavailable", [], "GROQ_API_KEY is not configured"
+    try:
+        verifier = GroqQwenValidator(api_key=api_key, model=model.strip())
+        events = validate_p2_result(p1, p2, verifier=verifier,
+                                    action_assessments=action_assessments)
+    except Exception as exc:
+        return "failed", [], f"Qwen verification failed: {type(exc).__name__}: {exc}"
+    return "complete", events, None
 
 
 def render_camera_result(p1, p2, bundle):
@@ -50,11 +67,26 @@ def render_camera_result(p1, p2, bundle):
             st.json(result.action_assessments.model_dump(mode="json"))
     taxonomy = load_taxonomy()
     names = {i.item_id: i.display_name for i in taxonomy.items}
-    st.subheader("CMAI camera coverage")
-    st.caption("This recording is the evidence window. No two-week caregiver frequency rating is inferred. Absence of a flag is not a confirmed negative.")
-    st.dataframe([{"CMAI item": a.cmai_item_id, "Behaviour": names[a.cmai_item_id],
-                   "Assessment": a.status.replace("_", " "), "Reason": a.reason}
-                  for a in result.availability], use_container_width=True)
+    physical_ids = camera_observable_ids(taxonomy)
+    st.subheader("Physical behaviour results")
+    st.caption("Only canonical behaviours observable from physical camera evidence are shown. Qwen verification uses extracted pose/motion evidence, not the original video.")
+    enabled_physical = {rule.item_id for rule in bundle.metadata.rules if rule.item_id in physical_ids}
+    if not enabled_physical:
+        st.warning("Physical behaviour detector is not configured. No physical behaviour result can be produced.")
+    display_events = [event for event in result.events if event.cmai_item_id in physical_ids]
+    if enabled_physical and not display_events:
+        st.info("No supported CMAI physical behaviour was detected in this video.")
+    else:
+        st.dataframe([{
+            "Person": event.evidence.person_id,
+            "Behaviour": names[event.cmai_item_id],
+            "Start": event.start_timestamp,
+            "End": event.end_timestamp,
+            "Status": {"supported": "verified", "unsupported": "rejected",
+                        "insufficient_evidence": "verification unavailable"}.get(
+                            (event.machine_validation or {}).get("result", {}).get("validation_status"),
+                            "candidate / pending verification"),
+        } for event in display_events], use_container_width=True)
     people = [p.person_id for p in p1.persons]
     options = [None, *people] if len(people) != 1 else people
     selected_person = st.selectbox("Person / session track to review", options,
@@ -65,7 +97,7 @@ def render_camera_result(p1, p2, bundle):
         coverage = next(c for c in result.coverage if c.person_id == selected_person)
         with st.expander("Track coverage and abstentions"):
             st.json(coverage.model_dump(mode="json"))
-        candidates = [e for e in result.events if e.evidence.person_id == selected_person]
+        candidates = [e for e in display_events if e.evidence.person_id == selected_person]
         if candidates:
             import plotly.graph_objects as go
             chart = go.Figure()
@@ -115,7 +147,7 @@ def render_camera_result(p1, p2, bundle):
                         st.error(str(exc))
         else:
             st.info("No reviewable candidates were produced for this track. Missing models, gaps and low-quality evidence remain unknown.")
-    st.download_button("Download CMAI camera result", result.model_dump_json(indent=2), "cmai-camera-result.json", "application/json")
+    st.download_button("Download camera result", result.model_dump_json(indent=2), "cmai-camera-result.json", "application/json")
     source_path = st.session_state.get("source_path")
     if source_path:
         st.download_button("Download result and evidence", export_archive(result, Path(source_path).parent / "evidence"),
@@ -172,6 +204,8 @@ def main():
             st.info("Enter your Groq API key to enable verification. Local video analysis works without it.")
         st.caption("Verify with Groq sends selected pose/motion evidence to Groq, not the raw video.")
         st.caption(f"Detector: {default_bundle.metadata.detector_id} / {default_bundle.metadata.version} · {default_bundle.metadata.mode}")
+        with st.expander("Runtime diagnostics"):
+            st.json(runtime_diagnostics("configured-by-P1", default_bundle.metadata.detector_mode))
 
     verifier_fingerprint = sha256((api_key + "\0" + model).encode()).hexdigest()
     if st.session_state.get("verifier_fingerprint") != verifier_fingerprint:
@@ -266,13 +300,41 @@ def main():
         st.success(st.session_state.pop("analysis_message"))
     st.write(f"Tracked people: {len(p1.persons)} · Behaviour candidates: {candidate_count}")
     if mode == "Video":
+        candidate_key = sha256(json.dumps([(p.person_id, [(e.behaviour, e.start_timestamp, e.end_timestamp)
+                                                          for e in p.events]) for p in p2.persons], sort_keys=True).encode()).hexdigest()
+        verification_key = sha256((candidate_key + "\0" + api_key + "\0" + model).encode()).hexdigest()
+        if st.session_state.get("verification_key") != verification_key:
+            status, reviews, error = automatic_verification(p1, p2, api_key, model,
+                                                            st.session_state.get("action_assessments"))
+            st.session_state.verification_key = verification_key
+            st.session_state.verification_status = status
+            st.session_state.verification_error = error
+            st.session_state.events = [review.model_dump(mode="json") for review in reviews]
+            if reviews:
+                if "camera_result" not in st.session_state:
+                    st.session_state.camera_result = build_camera_result(
+                        p1, p2, st.session_state.active_bundle,
+                        source_sha256=st.session_state.get("video_sha256"),
+                        action_assessments=st.session_state.get("action_assessments"))
+                st.session_state.camera_result = attach_machine_reviews(
+                    st.session_state.camera_result, reviews,
+                    {"provider": "Groq", "model": model.strip(),
+                     "evidence_packet_schema": "1.0"})
+        verification_status = st.session_state.get("verification_status")
+        if verification_status == "no_candidates":
+            st.info("No supported physical behaviour candidate was detected.")
+        elif verification_status == "unavailable":
+            st.warning("Physical behaviour candidate generated, but Qwen verification is unavailable because GROQ_API_KEY is not configured.")
+        elif verification_status == "failed":
+            st.error(st.session_state.get("verification_error", "Qwen verification failed."))
+        elif verification_status == "complete" and candidate_count:
+            st.success("P3/Qwen verification completed from extracted video pose/motion evidence.")
+    if mode == "Video":
         st.download_button("Download perception results", p1.model_dump_json(indent=2), "perception.json", "application/json")
         st.download_button("Download candidate results", p2.model_dump_json(indent=2), "candidates.json", "application/json")
-        if not st.session_state.active_bundle.metadata.rules:
-            st.info("Movement analysis is ready. No evaluated behaviour models are configured; no labels were generated.")
     selected_person = render_camera_result(p1, p2, st.session_state.active_bundle)
     selected_count = sum(len(p.events) for p in p2.persons if p.person_id == selected_person)
-    if st.button("Verify candidates with Groq", disabled=not api_key or not model.strip() or selected_count == 0):
+    if mode != "Video" and st.button("Verify candidates with Groq", disabled=not api_key or not model.strip() or selected_count == 0):
         with st.spinner("Verifying candidate evidence with Groq…"):
             verifier = GroqQwenValidator(api_key=api_key, model=model.strip())
             selected_p2 = p2.model_copy(deep=True)

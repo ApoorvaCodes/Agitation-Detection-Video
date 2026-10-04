@@ -16,7 +16,7 @@ require a new taxonomy version and a migration.
 
 ## Setup and upload
 
-Use the existing Python 3.11 environment:
+Use the existing Python 3.12 environment:
 
 ```sh
 source .venv/bin/activate
@@ -49,9 +49,11 @@ inputs cancels pending work and removes previous temporary files. Browser/sessio
 loss is not durable storage. Cancellation of a worker on abrupt server/browser
 failure is not guaranteed; normal UI cancellation/input changes are handled.
 
-Groq is optional. Enter its API key in the masked sidebar field and explicitly
-click **Verify candidates with Groq**. Only candidates for the chosen track are
-sent, as compact pose/motion evidence. No raw video is sent. The Qwen decision
+Groq is optional. Enter its API key in the masked sidebar field. In the normal
+Video flow, candidates are sent automatically to Qwen when the key is present;
+the advanced JSON flow retains an explicit verification control. Only
+candidates for the chosen track are sent in the advanced flow, as compact
+pose/motion evidence. No raw video is sent. The Qwen decision
 and its provider/model identity are stored as `machine_validation`; it never marks a human review confirmed.
 Changing the key/model clears machine verification, preserving human decisions.
 Supabase saves remain separate explicit actions with an opt-in checkbox, using

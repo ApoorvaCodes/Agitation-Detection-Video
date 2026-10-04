@@ -1,10 +1,11 @@
 """Deterministic CMAI-aware evidence quality checks."""
 from person3.taxonomy import normalize_behaviour
-from cmai.taxonomy import canonical_item
+from cmai.taxonomy import CAMERA_OBSERVABLE_STATUSES, canonical_item, load_taxonomy
 
 
 def validate_packet(packet):
     flags = []
+    legacy = None
     try:
         item_id = canonical_item(packet.behaviour, allow_legacy=True)
     except ValueError:
@@ -12,6 +13,16 @@ def validate_packet(packet):
         if legacy is None:
             return False, ["behaviour_not_in_cmai_taxonomy"]
         item_id = {"hitting": "cmai_07_hitting", "kicking": "cmai_08_kicking"}.get(legacy.key, legacy.key)
+    try:
+        item = load_taxonomy().item(item_id)
+    except ValueError:
+        # Keep the legacy Person 3 handoff readable; its physical-domain
+        # labels are not emitted by the canonical camera result contract.
+        if legacy is None or legacy.domain != "physical":
+            return False, ["behaviour_not_observable_from_camera"]
+    else:
+        if item.camera_status not in CAMERA_OBSERVABLE_STATUSES:
+            return False, ["behaviour_not_observable_from_camera"]
     if not packet.segments:
         return False, ["no_source_observations"]
     if len(packet.segments) < 2:

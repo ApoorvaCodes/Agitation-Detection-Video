@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "person1-video-perception"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.24,<3", "opencv-python>=4.8", "pydantic>=2.0,<3"]
+dependencies = ["numpy==1.26.4", "opencv-python==4.10.0.84", "pydantic==2.13.5"]
 
 [project.optional-dependencies]
 # Person 1 uses the legacy mp.solutions.pose API, present in this tested release.
@@ -20,9 +20,9 @@ models = [
     "protobuf>=4.25.3,<5",
     "lapx==0.10.0",
 ]
-test = ["pytest>=8"]
+test = ["pytest==9.1.1"]
 # This range supports MediaPipe's protobuf<5 requirement for video processing.
-dashboard = ["streamlit>=1.36,<1.46", "pandas>=2", "plotly>=5"]
+dashboard = ["streamlit==1.45.1", "pandas==2.3.3", "plotly==7.1.0"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
