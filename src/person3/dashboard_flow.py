@@ -6,6 +6,7 @@ from person1.config import Person1Config
 from person1.contracts import Person1VideoResult
 from person2.config import Person2Config
 from person3.p2_adapter import read_p2_handoff
+from person2.contracts import Person2VideoResult
 
 
 def resolve_groq_key(entered="", configured=""):
@@ -31,4 +32,4 @@ def read_dashboard_results(p1_data, p2_data):
     raw = json.loads(p2_data)
     if raw.get("video_id") != p1.video.video_id:
         raise ValueError("Person 1 and Person 2 results must be from the same video")
-    return p1, read_p2_handoff(raw)
+    return p1, Person2VideoResult.model_validate(raw)

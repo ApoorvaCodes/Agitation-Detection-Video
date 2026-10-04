@@ -8,13 +8,13 @@ Person 2 is the high-recall candidate generator. Person 3 checks whether the sup
 
 The adapter consumes the existing Person 2 `Person2VideoResult` schema 1.0 without altering its semantics. For each P2 person's `events[]`, it retains behaviour, interval, `peak_similarity`, and `chunk_ids`. Each source chunk supplies `chunk_id`, `frame_indices`, and optional behaviour scores. The score copied to the P3 candidate is the maximum matching non-null `smoothed_similarity`, falling back to the event's peak similarity. P2 calls this score `uncalibrated_cosine_similarity`; P3 carries it as a candidate score without calibration.
 
-The current checkout contains both P1 and P2. The video dashboard runs them in sequence. `person3.p2_adapter.read_p2_handoff` reads the exact versioned JSON handoff fields needed by P3 for advanced JSON review; `person3.evidence.candidates_from_p2` also accepts the P2 Python result object. Advanced uploads must have matching video IDs. P1 observations are identified deterministically as `{person_id}:frame:{frame_index}`. Person IDs are session-local tracker IDs and must not be interpreted as real identities.
+The current checkout contains both P1 and P2. The video dashboard runs them in sequence. The dashboard validates advanced uploads against the complete `Person2VideoResult`; `person3.p2_adapter.read_p2_handoff` remains available as the legacy field projection; `person3.evidence.candidates_from_p2` also accepts the P2 Python result object. Advanced uploads must have matching video IDs. P1 observations are identified deterministically as `{person_id}:frame:{frame_index}`. Person IDs are session-local tracker IDs and must not be interpreted as real identities.
 
 The versioned `CandidateBehaviour` adapter preserves candidate ID, person ID, label, score, interval, P2 source-window IDs, P1 observation IDs and additional evidence. It rejects unknown fields, nonfinite scores, invalid score bounds and nonpositive intervals.
 
 ## Taxonomy and mapping
 
-`person3.taxonomy` is the single label registry used by checks, verifier-facing packets and dashboard labels. It includes the project's requested physical and verbal categories. It also explicitly maps the Person 2 project's `pacing_aimless_wandering`, `repetitious_mannerisms`, and `general_restlessness` candidate labels to review categories. These are names for research review, not a claim that a short video establishes a two-week CMAI frequency rating. Unrecognized labels are not fuzzy-matched; they fail the taxonomy gate and abstain.
+`person3.taxonomy` retains the legacy verifier vocabulary. `cmai.taxonomy` supplies the strict 29-item camera map and canonical result IDs. It includes the project's requested physical and verbal categories. It also explicitly maps the Person 2 project's `pacing_aimless_wandering`, `repetitious_mannerisms`, and `general_restlessness` candidate labels to review categories. These are names for research review, not a claim that a short video establishes a two-week CMAI frequency rating. Unrecognized labels are not fuzzy-matched; they fail the taxonomy gate and abstain.
 
 ## Compact evidence construction
 
@@ -64,34 +64,31 @@ the [published universal2 wheel](https://pypi.org/project/mediapipe/0.10.21/).
 Native MediaPipe Pose initialization and YOLO tracking smoke checks both passed.
 This packaging warning remains; no dependency metadata was rewritten to hide it.
 
-**Video** is the default input. Upload a source video and click **Analyse
-video** to run P1 perception followed by P2 candidate generation. JSON files
-are internal outputs, available as downloads; they are not required inputs.
-Under **Behaviour references (optional)**, upload a compatible P2 prototype
-bank built from explicitly labelled training examples. Without that bank, the
-app extracts movement evidence and exports P1/P2 data but produces no invented
-candidate labels. Incompatible banks cause a visible analysis error. P1 and P2
-contracts, thresholds, and model algorithms are preserved.
+**Video** is the default input. The dashboard automatically loads a detector
+bundle, validates/decodes video in a cancellable subprocess and runs P1 → P2
+for separate tracks. The shipped bundle is explicitly unavailable because no
+evaluated labelled assets exist. A result reports all 29 items as available,
+research-only, unavailable or not assessed by camera, plus coverage/abstentions.
+An optional labelled prototype upload is a research override, not release approval.
 
-Enter a **Groq API key** in the sidebar's password field, or configure
-`GROQ_API_KEY` in the environment or `.streamlit/secrets.toml`. Typed entry takes
-precedence over Streamlit secrets, then environment. The key remains in the
-current session and is not written to result files. The model field defaults
-to the configured `QWEN_MODEL`, or `qwen/qwen3-32b`; it is editable. See
-[Groq's Qwen model documentation](https://console.groq.com/docs/model/qwen/qwen3-32b).
-Setting a key does not claim a successful connection. **Verify candidates with
-Groq** is enabled only when a key, model, and candidates are present. Clicking
-it sends compact pose/motion evidence; raw video is not sent. Local analysis
-does not require the key, and API failures remain unverified outcomes.
+Choose a track, inspect timestamped candidates/reference frames/clips, and save
+confirmed/rejected/uncertain human decisions separately from model output.
+Candidates can be reviewed before Groq. Enter the key in the masked sidebar
+field (entry > secrets > environment), then explicitly click **Verify candidates
+with Groq**. Only the chosen track's compact pose/motion evidence is sent; key
+entry alone does not test a connection. Machine verification is separate from
+human confirmation. A key/model change clears machine results, preserving human
+reviews. API failure is unknown evidence, never a negative classification.
 
-**Existing results (advanced)** retains the matching P1/P2 JSON workflow, with
-an optional source video for clips. The dashboard filters events, shows a
-timeline/table, and exposes evidence IDs and validation status. Clips are
-created on request. Uploaded videos and clips use isolated temporary session
-directories; changing inputs clears old results and cleans the previous
-directory. Changing the key or model clears previous verification results.
-Supabase persistence remains optional and requires its separate explicit
-save button.
+Legacy JSON review remains under **Existing results (advanced)**. Only explicit
+aliases 01, 26 and 29 migrate into camera results. Original asset/evaluation
+identity remains unknown. Before source clips, users must confirm the matching
+recording because legacy JSON has no checksum. Uploaded sources and evidence use
+temporary session directories; input changes cancel work and clear prior results.
+Download JSON or JSON-plus-evidence ZIP to preserve results. Supabase remains
+explicit and opt-in, using the existing machine-event metadata schema. Companion
+results and human decisions are currently local exports. See
+[full camera contract/workflow](CMAI_CAMERA.md) and [annotation protocol](CMAI_ANNOTATION.md).
 
 ## Optional Supabase
 

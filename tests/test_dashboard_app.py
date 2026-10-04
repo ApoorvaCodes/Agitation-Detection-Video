@@ -16,6 +16,17 @@ from person3_fixtures import make_source
 APP = Path(__file__).resolve().parents[1] / "dashboard.py"
 
 
+class CompleteJob:
+    def __init__(self, p1, p2):
+        self.p1, self.p2 = p1, p2
+    def status(self):
+        return {"phase": "complete", "message": "Video analysis completed."}
+    def results(self):
+        return self.p1, self.p2
+    def cancel(self):
+        pass
+
+
 def make_app(monkeypatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     return AppTest.from_file(str(APP), default_timeout=15)
@@ -33,7 +44,7 @@ def test_initial_screen_is_video_first_and_requests_masked_key(monkeypatch):
 
 def test_entered_key_is_configured_and_json_mode_is_optional(monkeypatch):
     app = make_app(monkeypatch).run()
-    app.text_input[0].set_value("test-key-not-real").run()
+    app.text_input(key="groq_api_key").set_value("test-key-not-real").run()
     assert not app.exception
     assert any("API key configured" in item.value for item in app.caption)
     app.radio[0].set_value("Existing results (advanced)").run()
@@ -47,7 +58,7 @@ def test_video_button_runs_both_stages_and_does_not_verify_without_candidates(mo
     p1 = make_source()
     p2 = process_perception(p1)
     with patch("streamlit.file_uploader", side_effect=lambda label, **kwargs: uploaded if label == "Upload video" else None), \
-         patch("person3.dashboard_flow.analyze_video", return_value=(p1, p2)) as analyze:
+         patch("cmai.jobs.start_analysis", return_value=CompleteJob(p1, p2)) as analyze:
         app = make_app(monkeypatch).run()
         assert not app.exception
         app.button[0].click().run()
@@ -68,7 +79,7 @@ def test_changing_video_clears_previous_results(monkeypatch):
     p1 = make_source()
     current = [first]
     with patch("streamlit.file_uploader", side_effect=lambda label, **kwargs: current[0] if label == "Upload video" else None), \
-         patch("person3.dashboard_flow.analyze_video", return_value=(p1, process_perception(p1))):
+         patch("cmai.jobs.start_analysis", return_value=CompleteJob(p1, process_perception(p1))):
         app = make_app(monkeypatch).run()
         app.button[0].click().run()
         previous_path = Path(app.session_state["source_path"])
@@ -96,12 +107,63 @@ def test_groq_uses_entered_key_only_after_verify_click(monkeypatch):
         app.radio[0].set_value("Existing results (advanced)").run()
         button = next(b for b in app.button if b.label == "Verify candidates with Groq")
         assert button.disabled
-        app.text_input[0].set_value("test-key-not-real").run()
+        app.selectbox(key="selected_person").select(p1.persons[0].person_id).run()
+        app.text_input(key="groq_api_key").set_value("test-key-not-real").run()
         assert not app.exception
         verifier.assert_not_called()
         button = next(b for b in app.button if b.label == "Verify candidates with Groq")
         assert not button.disabled
         button.click().run()
         assert not app.exception
-        verifier.assert_called_once_with(api_key="test-key-not-real", model=app.text_input[1].value)
+        verifier.assert_called_once_with(api_key="test-key-not-real", model=app.text_input(key="groq_model").value)
         assert validate.call_args.kwargs["verifier"] is verifier.return_value
+
+
+def test_local_candidate_review_is_available_before_groq_and_survives_key_change(monkeypatch):
+    from cmai.bundle import legacy_result_bundle
+    from cmai.results import build_camera_result
+    from test_cmai import candidates
+    p1, p2, _ = candidates()
+    files = {"Person 1 result JSON": BytesIO(p1.model_dump_json().encode()),
+             "Person 2 candidate result JSON": BytesIO(p2.model_dump_json().encode())}
+    with patch("streamlit.file_uploader", side_effect=lambda label, **kwargs: files.get(label)), \
+         patch("person3.qwen_validator.GroqQwenValidator") as verifier:
+        app = make_app(monkeypatch).run()
+        app.radio[0].set_value("Existing results (advanced)").run()
+        assert not app.exception
+        assert app.session_state.camera_result.events[0].status == "candidate"
+        next(b for b in app.button if b.label == "Save reviewer decision").click().run()
+        assert not app.exception
+        assert app.session_state.camera_result.events[0].status == "uncertain"
+        assert app.session_state.camera_result.events[0].model_status == "candidate"
+        app.text_input(key="groq_api_key").set_value("test-key-only").run()
+        assert app.session_state.camera_result.events[0].status == "uncertain"
+        verifier.assert_not_called()
+
+
+def test_multiple_tracks_require_selection_before_remote_review(monkeypatch):
+    from test_cmai import candidates
+    p1, p2, _ = candidates()
+    person = p1.persons[0].model_copy(deep=True)
+    person.person_id = "another-track"
+    p1.persons.append(person)
+    track = p2.persons[0].model_copy(deep=True)
+    track.person_id = person.person_id
+    # Keep chunk IDs distinct for this synthetic second track.
+    for c in track.chunks:
+        c.chunk_id = c.chunk_id.replace("p1:", "another-track:")
+    for e in track.events:
+        e.chunk_ids = [i.replace("p1:", "another-track:") for i in e.chunk_ids]
+    p2.persons.append(track)
+    files = {"Person 1 result JSON": BytesIO(p1.model_dump_json().encode()),
+             "Person 2 candidate result JSON": BytesIO(p2.model_dump_json().encode())}
+    with patch("streamlit.file_uploader", side_effect=lambda label, **kwargs: files.get(label)):
+        app = make_app(monkeypatch).run()
+        app.radio[0].set_value("Existing results (advanced)").run()
+        app.text_input(key="groq_api_key").set_value("test-key-only").run()
+        assert not app.exception
+        assert app.selectbox(key="selected_person").value is None
+        assert next(b for b in app.button if b.label == "Verify candidates with Groq").disabled
+        app.selectbox(key="selected_person").select("another-track").run()
+        assert not app.exception
+        assert not next(b for b in app.button if b.label == "Verify candidates with Groq").disabled

@@ -1,0 +1,178 @@
+{
+  "$defs": {
+    "AnnotatedRecording": {
+      "additionalProperties": false,
+      "properties": {
+        "perception": {
+          "title": "Perception",
+          "type": "string"
+        },
+        "person_id": {
+          "title": "Person Id",
+          "type": "string"
+        },
+        "subject_id": {
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "split": {
+          "enum": [
+            "train",
+            "validation",
+            "test"
+          ],
+          "title": "Split",
+          "type": "string"
+        },
+        "annotation_id": {
+          "title": "Annotation Id",
+          "type": "string"
+        },
+        "reviewed_start": {
+          "minimum": 0,
+          "title": "Reviewed Start",
+          "type": "number"
+        },
+        "reviewed_end": {
+          "exclusiveMinimum": 0,
+          "title": "Reviewed End",
+          "type": "number"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/EventAnnotation"
+          },
+          "title": "Events",
+          "type": "array"
+        }
+      },
+      "required": [
+        "perception",
+        "person_id",
+        "subject_id",
+        "session_id",
+        "split",
+        "annotation_id",
+        "reviewed_start",
+        "reviewed_end",
+        "events"
+      ],
+      "title": "AnnotatedRecording",
+      "type": "object"
+    },
+    "EventAnnotation": {
+      "additionalProperties": false,
+      "properties": {
+        "annotation_id": {
+          "minLength": 1,
+          "title": "Annotation Id",
+          "type": "string"
+        },
+        "perception": {
+          "minLength": 1,
+          "title": "Perception",
+          "type": "string"
+        },
+        "person_id": {
+          "minLength": 1,
+          "title": "Person Id",
+          "type": "string"
+        },
+        "split": {
+          "enum": [
+            "train",
+            "validation",
+            "test"
+          ],
+          "title": "Split",
+          "type": "string"
+        },
+        "start_timestamp": {
+          "minimum": 0,
+          "title": "Start Timestamp",
+          "type": "number"
+        },
+        "end_timestamp": {
+          "exclusiveMinimum": 0,
+          "title": "End Timestamp",
+          "type": "number"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Labels",
+          "type": "array"
+        },
+        "certainty": {
+          "enum": [
+            "observable",
+            "uncertain"
+          ],
+          "title": "Certainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "annotation_id",
+        "perception",
+        "person_id",
+        "split",
+        "start_timestamp",
+        "end_timestamp",
+        "labels",
+        "certainty"
+      ],
+      "title": "EventAnnotation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "cmai-event-annotations-1.0",
+      "default": "cmai-event-annotations-1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "taxonomy_version": {
+      "const": "cmai-long-form-camera-v1",
+      "default": "cmai-long-form-camera-v1",
+      "title": "Taxonomy Version",
+      "type": "string"
+    },
+    "provenance": {
+      "additionalProperties": true,
+      "title": "Provenance",
+      "type": "object"
+    },
+    "behaviours": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Behaviours",
+      "type": "array"
+    },
+    "recordings": {
+      "items": {
+        "$ref": "#/$defs/AnnotatedRecording"
+      },
+      "minItems": 1,
+      "title": "Recordings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "provenance",
+    "behaviours",
+    "recordings"
+  ],
+  "title": "EventManifest",
+  "type": "object"
+}

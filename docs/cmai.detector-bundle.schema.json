@@ -1,0 +1,283 @@
+{
+  "$defs": {
+    "DetectorRule": {
+      "additionalProperties": false,
+      "properties": {
+        "item_id": {
+          "title": "Item Id",
+          "type": "string"
+        },
+        "similarity_threshold": {
+          "maximum": 1,
+          "minimum": -1,
+          "title": "Similarity Threshold",
+          "type": "number"
+        },
+        "min_consecutive_chunks": {
+          "default": 2,
+          "minimum": 2,
+          "title": "Min Consecutive Chunks",
+          "type": "integer"
+        },
+        "min_event_seconds": {
+          "default": 2,
+          "exclusiveMinimum": 0,
+          "title": "Min Event Seconds",
+          "type": "number"
+        },
+        "min_evidence_fraction": {
+          "default": 0.6,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Min Evidence Fraction",
+          "type": "number"
+        }
+      },
+      "required": [
+        "item_id",
+        "similarity_threshold"
+      ],
+      "title": "DetectorRule",
+      "type": "object"
+    },
+    "Person2Config": {
+      "properties": {
+        "window_seconds": {
+          "default": 2.0,
+          "title": "Window Seconds",
+          "type": "number"
+        },
+        "overlap": {
+          "default": 0.5,
+          "title": "Overlap",
+          "type": "number"
+        },
+        "max_gap_seconds": {
+          "default": 1.0,
+          "title": "Max Gap Seconds",
+          "type": "number"
+        },
+        "min_frames": {
+          "default": 3,
+          "title": "Min Frames",
+          "type": "integer"
+        },
+        "min_valid_fraction": {
+          "default": 0.6,
+          "title": "Min Valid Fraction",
+          "type": "number"
+        },
+        "min_shared_fraction": {
+          "default": 0.5,
+          "title": "Min Shared Fraction",
+          "type": "number"
+        },
+        "similarity_threshold": {
+          "default": 0.8,
+          "title": "Similarity Threshold",
+          "type": "number"
+        },
+        "smoothing_alpha": {
+          "default": 0.5,
+          "title": "Smoothing Alpha",
+          "type": "number"
+        },
+        "min_event_seconds": {
+          "default": 1.0,
+          "title": "Min Event Seconds",
+          "type": "number"
+        },
+        "pose_weight": {
+          "default": 1.0,
+          "title": "Pose Weight",
+          "type": "number"
+        },
+        "motion_weight": {
+          "default": 1.0,
+          "title": "Motion Weight",
+          "type": "number"
+        },
+        "video_weight": {
+          "default": 1.0,
+          "title": "Video Weight",
+          "type": "number"
+        }
+      },
+      "title": "Person2Config",
+      "type": "object"
+    },
+    "ReleaseEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "annotation_protocol": {
+          "minLength": 1,
+          "title": "Annotation Protocol",
+          "type": "string"
+        },
+        "dataset_provenance": {
+          "minLength": 1,
+          "title": "Dataset Provenance",
+          "type": "string"
+        },
+        "permissions": {
+          "minLength": 1,
+          "title": "Permissions",
+          "type": "string"
+        },
+        "evaluation_report": {
+          "minLength": 1,
+          "title": "Evaluation Report",
+          "type": "string"
+        },
+        "evaluation_report_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Evaluation Report Sha256",
+          "type": "string"
+        },
+        "acceptance_criteria": {
+          "minLength": 1,
+          "title": "Acceptance Criteria",
+          "type": "string"
+        },
+        "acceptance_criteria_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Acceptance Criteria Sha256",
+          "type": "string"
+        },
+        "evidence_path_test": {
+          "minLength": 1,
+          "title": "Evidence Path Test",
+          "type": "string"
+        },
+        "approved_by": {
+          "minLength": 1,
+          "title": "Approved By",
+          "type": "string"
+        },
+        "approved_at": {
+          "minLength": 1,
+          "title": "Approved At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "annotation_protocol",
+        "dataset_provenance",
+        "permissions",
+        "evaluation_report",
+        "evaluation_report_sha256",
+        "acceptance_criteria",
+        "acceptance_criteria_sha256",
+        "evidence_path_test",
+        "approved_by",
+        "approved_at"
+      ],
+      "title": "ReleaseEvidence",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "taxonomy_version": {
+      "const": "cmai-long-form-camera-v1",
+      "default": "cmai-long-form-camera-v1",
+      "title": "Taxonomy Version",
+      "type": "string"
+    },
+    "detector_id": {
+      "minLength": 1,
+      "title": "Detector Id",
+      "type": "string"
+    },
+    "version": {
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "unavailable",
+        "research",
+        "released",
+        "legacy_review"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "configuration": {
+      "$ref": "#/$defs/Person2Config"
+    },
+    "pose_representation": {
+      "default": "stats",
+      "enum": [
+        "stats",
+        "time-bins"
+      ],
+      "title": "Pose Representation",
+      "type": "string"
+    },
+    "temporal_bins": {
+      "default": 4,
+      "minimum": 2,
+      "title": "Temporal Bins",
+      "type": "integer"
+    },
+    "prototype_file": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Prototype File"
+    },
+    "prototype_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Prototype Sha256"
+    },
+    "rules": {
+      "items": {
+        "$ref": "#/$defs/DetectorRule"
+      },
+      "title": "Rules",
+      "type": "array"
+    },
+    "release_evidence": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReleaseEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "detector_id",
+    "version",
+    "mode",
+    "configuration"
+  ],
+  "title": "DetectorBundle",
+  "type": "object"
+}

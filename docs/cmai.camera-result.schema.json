@@ -1,0 +1,876 @@
+{
+  "$defs": {
+    "BehaviourScore": {
+      "additionalProperties": false,
+      "properties": {
+        "behaviour": {
+          "title": "Behaviour",
+          "type": "string"
+        },
+        "similarity": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Similarity"
+        },
+        "smoothed_similarity": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Smoothed Similarity"
+        },
+        "shared_fraction": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Shared Fraction",
+          "type": "number"
+        },
+        "candidate": {
+          "default": false,
+          "title": "Candidate",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "behaviour",
+        "shared_fraction"
+      ],
+      "title": "BehaviourScore",
+      "type": "object"
+    },
+    "CameraEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "minLength": 1,
+          "title": "Event Id",
+          "type": "string"
+        },
+        "taxonomy_version": {
+          "const": "cmai-long-form-camera-v1",
+          "default": "cmai-long-form-camera-v1",
+          "title": "Taxonomy Version",
+          "type": "string"
+        },
+        "cmai_item_id": {
+          "title": "Cmai Item Id",
+          "type": "string"
+        },
+        "model_status": {
+          "const": "candidate",
+          "default": "candidate",
+          "title": "Model Status",
+          "type": "string"
+        },
+        "status": {
+          "default": "candidate",
+          "enum": [
+            "candidate",
+            "reviewed_confirmed",
+            "reviewed_rejected",
+            "uncertain"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "start_timestamp": {
+          "minimum": 0,
+          "title": "Start Timestamp",
+          "type": "number"
+        },
+        "end_timestamp": {
+          "exclusiveMinimum": 0,
+          "title": "End Timestamp",
+          "type": "number"
+        },
+        "score": {
+          "maximum": 1,
+          "minimum": -1,
+          "title": "Score",
+          "type": "number"
+        },
+        "score_semantics": {
+          "const": "uncalibrated_cosine_similarity",
+          "default": "uncalibrated_cosine_similarity",
+          "title": "Score Semantics",
+          "type": "string"
+        },
+        "source_label": {
+          "title": "Source Label",
+          "type": "string"
+        },
+        "source_candidate_id": {
+          "title": "Source Candidate Id",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/CandidateEvidence"
+        },
+        "quality": {
+          "$ref": "#/$defs/CandidateQuality"
+        },
+        "review_history": {
+          "items": {
+            "$ref": "#/$defs/ReviewDecision"
+          },
+          "title": "Review History",
+          "type": "array"
+        },
+        "evidence_check": {
+          "additionalProperties": true,
+          "title": "Evidence Check",
+          "type": "object"
+        },
+        "machine_validation": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Machine Validation"
+        }
+      },
+      "required": [
+        "event_id",
+        "cmai_item_id",
+        "start_timestamp",
+        "end_timestamp",
+        "score",
+        "source_label",
+        "source_candidate_id",
+        "evidence",
+        "quality",
+        "evidence_check"
+      ],
+      "title": "CameraEvent",
+      "type": "object"
+    },
+    "CandidateEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "video_id": {
+          "minLength": 1,
+          "title": "Video Id",
+          "type": "string"
+        },
+        "person_id": {
+          "minLength": 1,
+          "title": "Person Id",
+          "type": "string"
+        },
+        "chunk_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Chunk Ids",
+          "type": "array"
+        },
+        "frame_indices": {
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1,
+          "title": "Frame Indices",
+          "type": "array"
+        },
+        "clip_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Path"
+        },
+        "clip_status": {
+          "default": "pending",
+          "enum": [
+            "pending",
+            "available",
+            "unavailable"
+          ],
+          "title": "Clip Status",
+          "type": "string"
+        },
+        "clip_start_timestamp": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Start Timestamp"
+        }
+      },
+      "required": [
+        "video_id",
+        "person_id",
+        "chunk_ids",
+        "frame_indices"
+      ],
+      "title": "CandidateEvidence",
+      "type": "object"
+    },
+    "CandidateQuality": {
+      "additionalProperties": false,
+      "properties": {
+        "visibility": {
+          "default": "unknown",
+          "enum": [
+            "adequate",
+            "limited",
+            "unknown"
+          ],
+          "title": "Visibility",
+          "type": "string"
+        },
+        "occlusion_fraction": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occlusion Fraction"
+        },
+        "min_valid_fraction": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Valid Fraction",
+          "type": "number"
+        },
+        "review_status": {
+          "default": "pending",
+          "enum": [
+            "pending",
+            "confirmed",
+            "rejected",
+            "uncertain"
+          ],
+          "title": "Review Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "min_valid_fraction"
+      ],
+      "title": "CandidateQuality",
+      "type": "object"
+    },
+    "CoverageInterval": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk_id": {
+          "title": "Chunk Id",
+          "type": "string"
+        },
+        "segment_id": {
+          "minimum": 0,
+          "title": "Segment Id",
+          "type": "integer"
+        },
+        "start_timestamp": {
+          "minimum": 0,
+          "title": "Start Timestamp",
+          "type": "number"
+        },
+        "end_timestamp": {
+          "exclusiveMinimum": 0,
+          "title": "End Timestamp",
+          "type": "number"
+        },
+        "valid_fraction": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Valid Fraction",
+          "type": "number"
+        },
+        "status": {
+          "enum": [
+            "scored",
+            "low_quality",
+            "no_prototypes",
+            "insufficient_evidence"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "scores": {
+          "items": {
+            "$ref": "#/$defs/BehaviourScore"
+          },
+          "title": "Scores",
+          "type": "array"
+        }
+      },
+      "required": [
+        "chunk_id",
+        "segment_id",
+        "start_timestamp",
+        "end_timestamp",
+        "valid_fraction",
+        "status",
+        "scores"
+      ],
+      "title": "CoverageInterval",
+      "type": "object"
+    },
+    "DetectorBundle": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "taxonomy_version": {
+          "const": "cmai-long-form-camera-v1",
+          "default": "cmai-long-form-camera-v1",
+          "title": "Taxonomy Version",
+          "type": "string"
+        },
+        "detector_id": {
+          "minLength": 1,
+          "title": "Detector Id",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "unavailable",
+            "research",
+            "released",
+            "legacy_review"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "configuration": {
+          "$ref": "#/$defs/Person2Config"
+        },
+        "pose_representation": {
+          "default": "stats",
+          "enum": [
+            "stats",
+            "time-bins"
+          ],
+          "title": "Pose Representation",
+          "type": "string"
+        },
+        "temporal_bins": {
+          "default": 4,
+          "minimum": 2,
+          "title": "Temporal Bins",
+          "type": "integer"
+        },
+        "prototype_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prototype File"
+        },
+        "prototype_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prototype Sha256"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/DetectorRule"
+          },
+          "title": "Rules",
+          "type": "array"
+        },
+        "release_evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReleaseEvidence"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "detector_id",
+        "version",
+        "mode",
+        "configuration"
+      ],
+      "title": "DetectorBundle",
+      "type": "object"
+    },
+    "DetectorRule": {
+      "additionalProperties": false,
+      "properties": {
+        "item_id": {
+          "title": "Item Id",
+          "type": "string"
+        },
+        "similarity_threshold": {
+          "maximum": 1,
+          "minimum": -1,
+          "title": "Similarity Threshold",
+          "type": "number"
+        },
+        "min_consecutive_chunks": {
+          "default": 2,
+          "minimum": 2,
+          "title": "Min Consecutive Chunks",
+          "type": "integer"
+        },
+        "min_event_seconds": {
+          "default": 2,
+          "exclusiveMinimum": 0,
+          "title": "Min Event Seconds",
+          "type": "number"
+        },
+        "min_evidence_fraction": {
+          "default": 0.6,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Min Evidence Fraction",
+          "type": "number"
+        }
+      },
+      "required": [
+        "item_id",
+        "similarity_threshold"
+      ],
+      "title": "DetectorRule",
+      "type": "object"
+    },
+    "ItemAvailability": {
+      "additionalProperties": false,
+      "properties": {
+        "cmai_item_id": {
+          "title": "Cmai Item Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "available",
+            "research_only",
+            "unavailable",
+            "not_assessed_by_camera"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cmai_item_id",
+        "status",
+        "reason"
+      ],
+      "title": "ItemAvailability",
+      "type": "object"
+    },
+    "Person2Config": {
+      "properties": {
+        "window_seconds": {
+          "default": 2.0,
+          "title": "Window Seconds",
+          "type": "number"
+        },
+        "overlap": {
+          "default": 0.5,
+          "title": "Overlap",
+          "type": "number"
+        },
+        "max_gap_seconds": {
+          "default": 1.0,
+          "title": "Max Gap Seconds",
+          "type": "number"
+        },
+        "min_frames": {
+          "default": 3,
+          "title": "Min Frames",
+          "type": "integer"
+        },
+        "min_valid_fraction": {
+          "default": 0.6,
+          "title": "Min Valid Fraction",
+          "type": "number"
+        },
+        "min_shared_fraction": {
+          "default": 0.5,
+          "title": "Min Shared Fraction",
+          "type": "number"
+        },
+        "similarity_threshold": {
+          "default": 0.8,
+          "title": "Similarity Threshold",
+          "type": "number"
+        },
+        "smoothing_alpha": {
+          "default": 0.5,
+          "title": "Smoothing Alpha",
+          "type": "number"
+        },
+        "min_event_seconds": {
+          "default": 1.0,
+          "title": "Min Event Seconds",
+          "type": "number"
+        },
+        "pose_weight": {
+          "default": 1.0,
+          "title": "Pose Weight",
+          "type": "number"
+        },
+        "motion_weight": {
+          "default": 1.0,
+          "title": "Motion Weight",
+          "type": "number"
+        },
+        "video_weight": {
+          "default": 1.0,
+          "title": "Video Weight",
+          "type": "number"
+        }
+      },
+      "title": "Person2Config",
+      "type": "object"
+    },
+    "ReleaseEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "annotation_protocol": {
+          "minLength": 1,
+          "title": "Annotation Protocol",
+          "type": "string"
+        },
+        "dataset_provenance": {
+          "minLength": 1,
+          "title": "Dataset Provenance",
+          "type": "string"
+        },
+        "permissions": {
+          "minLength": 1,
+          "title": "Permissions",
+          "type": "string"
+        },
+        "evaluation_report": {
+          "minLength": 1,
+          "title": "Evaluation Report",
+          "type": "string"
+        },
+        "evaluation_report_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Evaluation Report Sha256",
+          "type": "string"
+        },
+        "acceptance_criteria": {
+          "minLength": 1,
+          "title": "Acceptance Criteria",
+          "type": "string"
+        },
+        "acceptance_criteria_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Acceptance Criteria Sha256",
+          "type": "string"
+        },
+        "evidence_path_test": {
+          "minLength": 1,
+          "title": "Evidence Path Test",
+          "type": "string"
+        },
+        "approved_by": {
+          "minLength": 1,
+          "title": "Approved By",
+          "type": "string"
+        },
+        "approved_at": {
+          "minLength": 1,
+          "title": "Approved At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "annotation_protocol",
+        "dataset_provenance",
+        "permissions",
+        "evaluation_report",
+        "evaluation_report_sha256",
+        "acceptance_criteria",
+        "acceptance_criteria_sha256",
+        "evidence_path_test",
+        "approved_by",
+        "approved_at"
+      ],
+      "title": "ReleaseEvidence",
+      "type": "object"
+    },
+    "ReviewDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "enum": [
+            "confirmed",
+            "rejected",
+            "uncertain"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "reviewed_at": {
+          "minLength": 1,
+          "title": "Reviewed At",
+          "type": "string"
+        },
+        "reviewer": {
+          "minLength": 1,
+          "title": "Reviewer",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "decision",
+        "reviewed_at",
+        "reviewer"
+      ],
+      "title": "ReviewDecision",
+      "type": "object"
+    },
+    "TrackCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "person_id": {
+          "title": "Person Id",
+          "type": "string"
+        },
+        "observed_frame_count": {
+          "minimum": 0,
+          "title": "Observed Frame Count",
+          "type": "integer"
+        },
+        "first_timestamp": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "First Timestamp"
+        },
+        "last_timestamp": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Timestamp"
+        },
+        "intervals": {
+          "items": {
+            "$ref": "#/$defs/CoverageInterval"
+          },
+          "title": "Intervals",
+          "type": "array"
+        }
+      },
+      "required": [
+        "person_id",
+        "observed_frame_count",
+        "intervals"
+      ],
+      "title": "TrackCoverage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "cmai-camera-result-1.0",
+      "default": "cmai-camera-result-1.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "taxonomy_version": {
+      "const": "cmai-long-form-camera-v1",
+      "default": "cmai-long-form-camera-v1",
+      "title": "Taxonomy Version",
+      "type": "string"
+    },
+    "taxonomy_form": {
+      "const": "CMAI 29-item long form",
+      "default": "CMAI 29-item long form",
+      "title": "Taxonomy Form",
+      "type": "string"
+    },
+    "taxonomy_edition": {
+      "title": "Taxonomy Edition",
+      "type": "string"
+    },
+    "taxonomy_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Taxonomy Sha256",
+      "type": "string"
+    },
+    "video_id": {
+      "title": "Video Id",
+      "type": "string"
+    },
+    "source_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Sha256"
+    },
+    "recording_duration_seconds": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Recording Duration Seconds"
+    },
+    "source_metadata": {
+      "additionalProperties": true,
+      "title": "Source Metadata",
+      "type": "object"
+    },
+    "detector": {
+      "$ref": "#/$defs/DetectorBundle"
+    },
+    "detector_bundle_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Detector Bundle Sha256",
+      "type": "string"
+    },
+    "encoder_metadata": {
+      "additionalProperties": true,
+      "title": "Encoder Metadata",
+      "type": "object"
+    },
+    "availability": {
+      "items": {
+        "$ref": "#/$defs/ItemAvailability"
+      },
+      "title": "Availability",
+      "type": "array"
+    },
+    "coverage": {
+      "items": {
+        "$ref": "#/$defs/TrackCoverage"
+      },
+      "title": "Coverage",
+      "type": "array"
+    },
+    "events": {
+      "items": {
+        "$ref": "#/$defs/CameraEvent"
+      },
+      "title": "Events",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "taxonomy_edition",
+    "taxonomy_sha256",
+    "video_id",
+    "source_metadata",
+    "detector",
+    "detector_bundle_sha256",
+    "encoder_metadata",
+    "availability",
+    "coverage",
+    "events",
+    "limitations"
+  ],
+  "title": "CameraResult",
+  "type": "object"
+}

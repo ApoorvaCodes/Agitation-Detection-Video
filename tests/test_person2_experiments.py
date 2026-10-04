@@ -16,17 +16,25 @@ def manifest_fixture(tmp_path):
     records = []
     for split in ("train", "validation", "test"):
         data = source([observation(i / 5, x=1 if i < 5 else -3 if i < 10 else 0) for i in range(15)])
+        from person1.contracts import Landmark
+        for o in data.persons[0].observations:
+            for joint in ("left_hip", "right_hip", "left_knee", "right_knee", "left_ankle", "right_ankle"):
+                o.normalized_pose.landmarks[joint] = Landmark(x=.3, y=.5)
+                o.quality.landmark_validity[joint] = True
+            for name in ("bbox_center.displacement", "body_centroid.velocity.speed"):
+                o.motion.feature_values[name] = .2
+                o.quality.feature_validity[name] = True
         data.video.video_id = f"fixture-{split}"
         path = tmp_path / f"{split}.json"
         save_perception(data, path)
-        for index, labels in enumerate((["behaviour_a"], ["behaviour_b"], [])):
+        for index, labels in enumerate((["cmai_01_pacing_aimless_wandering"], ["cmai_29_general_restlessness"], [])):
             records.append({"perception": path.name, "person_id": "p1", "chunk_id": f"p1:{index}",
                             "subject_id": f"subject-{split}", "session_id": f"session-{split}",
                             "annotation_id": f"annotation-{split}-{index}", "split": split, "labels": labels})
-    manifest = {"schema_version": "1.0", "provenance": {"name": "synthetic unit fixtures only",
+    manifest = {"schema_version": "2.0", "provenance": {"name": "synthetic unit fixtures only",
                  "source": "tests, not research data", "annotation_protocol": "explicit algorithm fixture labels",
-                 "annotation_version": "test-1", "license_or_permission": "repository tests"},
-                "behaviours": ["behaviour_a", "behaviour_b"], "records": records}
+                 "annotation_version": "test-1", "license_or_permission": "repository tests", "label_agreement": "Synthetic unit labels; no human agreement measured"},
+                "behaviours": ["cmai_01_pacing_aimless_wandering", "cmai_29_general_restlessness"], "records": records}
     path = tmp_path / "manifest.json"
     path.write_text(json.dumps(manifest))
     return path, manifest

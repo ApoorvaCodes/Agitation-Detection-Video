@@ -59,9 +59,9 @@ required fields are:
 
 | Field | Purpose |
 | --- | --- |
-| `schema_version` | Exactly `1.0` |
-| `provenance` | Dataset `name`, `source`, `annotation_protocol`, `annotation_version`, `license_or_permission` |
-| `behaviours` | Explicit ordered list of candidate labels to evaluate |
+| `schema_version` | Exactly `2.0` |
+| `provenance` | Dataset `name`, `source`, `annotation_protocol`, `annotation_version`, `license_or_permission`, `label_agreement` |
+| `behaviours` | Explicit canonical CMAI IDs 01, 26 and 29 to evaluate |
 | `records` | Explicit annotations for individual source track/chunk windows |
 
 Each record requires `perception` (path relative to the manifest), `person_id`
@@ -140,14 +140,14 @@ invented prototypes. Training negatives contribute no positive prototype;
 negative examples in evaluation measure false candidate support.
 
 For each representation, the threshold grid is evaluated on `validation` only.
-The runner selects the threshold with the highest validation micro-F1; a tie
+The runner selects the threshold with the highest validation event micro-F1 when event annotations are supplied, otherwise chunk micro-F1; a tie
 favors the higher threshold. If validation has no usable coverage or no defined
 F1, threshold selection and test evaluation remain pending. Only the selected
 threshold is applied to `test`. Test labels cannot affect prototypes or tuning.
 Inference smoothing can use unannotated preceding chunks within that same
 held-out track, but it never uses their labels.
 
-Metrics are **chunk-level multilabel candidate metrics**:
+Chunk metrics are **multilabel candidate metrics**:
 
 - Per-label TP, FP, FN, and TN, precision, recall, and F1.
 - Micro precision/recall/F1 and macro-F1 over labels with defined F1; the number
@@ -182,10 +182,13 @@ normalization removes some whole-body translation, so pose alone may miss
 pacing evidence. Motion units still depend on Person 1's schema; signed-log
 compression and block weights are engineering choices. Bbox and pose errors,
 occlusion, camera motion, sparse sampling, and domain shift can affect scores.
-Overlapping chunks are correlated; confidence intervals and event-localization
-metrics are not currently implemented. No trained action checkpoint, class
+Overlapping chunks are correlated; confidence intervals are not estimated. Event annotation manifests additionally report temporal-IoU matching and onset/offset errors. No trained action checkpoint, class
 calibration, deep temporal model, or empirical model ranking is bundled.
 
 Person 3 must review candidate intervals, preserve unknowns, perform CMAI
 validation and final verification, and handle all downstream product/storage
 work. Those tasks are outside this module.
+
+## CMAI camera event workflow
+
+New training manifests require schema `2.0`, `taxonomy_version: cmai-long-form-camera-v1`, and `detector_mode: pose_motion_camera`. Canonical CMAI IDs and label-agreement provenance are required. Existing schema `1.0` result/prototype handoffs remain compatible. See [camera annotation and event evaluation](CMAI_ANNOTATION.md) for event-level preparation, uncertain coverage, per-item evidence gates and release criteria, and [camera workflow](CMAI_CAMERA.md) for asset packaging. No empirical dataset or release approval is bundled.

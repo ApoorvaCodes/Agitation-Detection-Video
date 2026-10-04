@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 import logging
+import math
 import cv2
 from person1.errors import VideoLoadError, VideoMetadataError
 LOGGER = logging.getLogger(__name__)
@@ -19,12 +20,20 @@ class VideoLoader:
         self.path = Path(path)
         if not self.path.is_file(): raise VideoLoadError(f"Video file does not exist: {self.path}")
         self.capture = cv2.VideoCapture(str(self.path))
-        if not self.capture.isOpened(): raise VideoLoadError(f"Unable to open video decoder: {self.path}")
-        self.metadata = self._metadata(); LOGGER.info("opened video path=%s metadata=%s", self.path, self.metadata)
+        if not self.capture.isOpened():
+            self.close()
+            raise VideoLoadError(f"Unable to open video decoder: {self.path}")
+        try:
+            self.metadata = self._metadata()
+        except Exception:
+            self.close()
+            raise
+        LOGGER.info("opened video path=%s metadata=%s", self.path, self.metadata)
     def _metadata(self) -> VideoMetadataRaw:
-        width, height, fps = (int(self.capture.get(x)) for x in (cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT, cv2.CAP_PROP_FPS))
+        width, height = (int(self.capture.get(x)) for x in (cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = float(self.capture.get(cv2.CAP_PROP_FPS))
         if width <= 0 or height <= 0: raise VideoMetadataError(f"Invalid dimensions: {width}x{height}")
-        if fps <= 0: raise VideoMetadataError(f"Invalid FPS: {fps}")
+        if not math.isfinite(fps) or fps <= 0: raise VideoMetadataError(f"Invalid FPS: {fps}")
         raw_count = int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT)); count = raw_count if raw_count > 0 else None
         code = int(self.capture.get(cv2.CAP_PROP_FOURCC)); codec = "".join(chr((code >> (8*i)) & 255) for i in range(4)).strip("\x00 ") or None
         return VideoMetadataRaw(str(self.path), width, height, fps, count, count / fps if count else None, codec, 3)

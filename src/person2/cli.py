@@ -10,6 +10,7 @@ from person2.experiments import run_experiments
 from person2.io import load_prototypes, load_result, save_prototypes, save_result
 from person2.pipeline import process_perception
 from person2.prototypes import build_prototypes
+from cmai.taxonomy import require_initial_items
 
 
 def main():
@@ -56,8 +57,9 @@ def main():
         manifest_path = Path(args.manifest)
         examples = []
         for item in json.loads(manifest_path.read_text()):
-            if item.get("split", "train") != "train":
+            if item.get("split") != "train":
                 raise ValueError("prototype builder accepts explicitly labelled training examples only")
+            require_initial_items([item["behaviour"]])
             result = load_result(manifest_path.parent / item["result"])
             matches = [c for p in result.persons for c in p.chunks if c.chunk_id == item["chunk_id"]]
             if len(matches) != 1 or matches[0].status in {"low_quality", "insufficient_evidence"}:

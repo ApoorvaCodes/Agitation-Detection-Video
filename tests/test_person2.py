@@ -174,7 +174,7 @@ def test_cli_prototype_workflow(tmp_path, monkeypatch):
     monkeypatch.setattr("sys.argv", ["person2", "run", "--input", str(perception_path), "--output", str(output)])
     main()
     manifest = tmp_path / "labels.json"
-    manifest.write_text(json.dumps([{"result": "result.json", "chunk_id": "p1:0", "behaviour": "general_restlessness"}]))
+    manifest.write_text(json.dumps([{"result": "result.json", "chunk_id": "p1:0", "behaviour": "cmai_29_general_restlessness", "split": "train"}]))
     bank = tmp_path / "bank.json"
     monkeypatch.setattr("sys.argv", ["person2", "build-prototypes", "--manifest", str(manifest),
                                      "--output", str(bank), "--version", "v1"])

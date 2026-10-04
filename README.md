@@ -50,9 +50,15 @@ Groq API key in the password field in the sidebar to enable **Verify candidates
 with Groq**; `GROQ_API_KEY` or Streamlit secrets also work. Verification sends
 selected pose/motion evidence, not the raw video, only when requested.
 
-Candidate generation requires a prototype bank from explicitly labelled
-training examples. Upload it under **Behaviour references (optional)**.
-Without it, video movement analysis and JSON exports still work, but no
-behaviour labels are invented. **Existing results (advanced)** preserves the
-P1/P2 JSON review workflow. See [Person 3 setup](docs/PERSON3.md) and
-[prototype training instructions](docs/PERSON2_CONTRACT.md).
+The app automatically loads `configs/cmai_detector_bundle.json`, or a local
+bundle selected through `CMAI_DETECTOR_BUNDLE`. No evaluated behaviour assets are
+bundled yet: the default result marks behaviours unavailable or not assessed by
+camera, preserves coverage/abstentions, and does not invent labels. A prototype
+upload under **Behaviour references (optional)** is an advanced research override.
+
+Select a person track, inspect timestamped candidates and source evidence, save
+reviewer decisions, and export the versioned CMAI camera JSON and evidence ZIP.
+Analysis includes progress and cancellation. **Existing results (advanced)**
+retains compatible P1/P2 JSON review. See [camera setup and contract](docs/CMAI_CAMERA.md),
+[annotation/evaluation protocol](docs/CMAI_ANNOTATION.md), [Person 3 setup](docs/PERSON3.md),
+and [Person 2 experiments](docs/PERSON2_EXPERIMENTS.md).

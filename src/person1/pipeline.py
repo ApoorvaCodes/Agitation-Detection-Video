@@ -14,13 +14,15 @@ class _State:
 class Person1Pipeline:
     def __init__(self, config: Person1Config|None=None, detector: Detector|None=None, pose_estimator: PoseEstimator|None=None, tracker=None):
         self.config=config or Person1Config(); self.config.validate(); self.detector=detector; self.pose_estimator=pose_estimator; self.tracker=tracker or (IoUTracker() if self.config.tracker == "iou_fallback" or detector is not None else None)
-    def process(self, path: str|Path) -> Person1VideoResult:
+    def process(self, path: str|Path, progress_callback=None) -> Person1VideoResult:
         with VideoLoader(path) as loader:
             if self.detector is None and self.config.tracker == "iou_fallback": self.detector=UltralyticsPersonDetector(self.config.yolo_model,self.config.yolo_confidence_threshold,self.config.yolo_iou_threshold)
             if self.detector is None: self.detector=UltralyticsPersonTracker(self.config.yolo_model,self.config.yolo_confidence_threshold,self.config.yolo_iou_threshold,self.config.tracker)
             if self.pose_estimator is None: self.pose_estimator=MediaPipePoseEstimator(self.config.pose_model_complexity,self.config.pose_min_detection_confidence,self.config.pose_min_tracking_confidence)
             persons: dict[str,TrackedPerson]={}; states: dict[str,_State]={}
             for frame in loader.frames(self.config.frame_sample_fps):
+                if progress_callback is not None:
+                    progress_callback(frame.timestamp)
                 detections = self.detector.detect_tracks(frame.image) if hasattr(self.detector,"detect_tracks") else [(track_id,detection) for track_id,detection in self.tracker.update(self.detector.detect(frame.image))]
                 for track_id,detection in detections:
                     persons.setdefault(track_id,TrackedPerson(person_id=track_id))
@@ -51,7 +53,7 @@ class Person1Pipeline:
                 confidences=[o.detection_confidence for o in person.observations]; interpolated=sum(o.quality.bbox_interpolated for o in person.observations); person.statistics={"first_frame":person.observations[0].frame_index,"last_frame":person.observations[-1].frame_index,"visible_frames":len(person.observations)-interpolated,"mean_detection_confidence":sum(confidences)/len(confidences),"fraction_interpolated":interpolated/len(person.observations),"duration_seconds":person.observations[-1].timestamp-person.observations[0].timestamp}
         return Person1VideoResult(video=VideoMetadata(video_id=self.config.video_id or Path(path).stem,source_path=str(path),duration_seconds=metadata.duration_seconds,fps=metadata.fps,width=metadata.width,height=metadata.height,frame_count=metadata.frame_count,codec=metadata.codec,channels=metadata.channels,processed_fps=self.config.frame_sample_fps,detector_model=self.config.yolo_model,tracker_type=self.config.tracker,configuration=config_snapshot,landmark_schema=MEDIAPIPE_LANDMARK_NAMES,feature_names=feature_names(),window_feature_names=window_feature_names()),persons=list(persons.values()))
 
-def process_video(path: str|Path, config: Person1Config|None=None, detector: Detector|None=None, pose_estimator: PoseEstimator|None=None) -> Person1VideoResult: return Person1Pipeline(config,detector,pose_estimator).process(path)
+def process_video(path: str|Path, config: Person1Config|None=None, detector: Detector|None=None, pose_estimator: PoseEstimator|None=None, progress_callback=None) -> Person1VideoResult: return Person1Pipeline(config,detector,pose_estimator).process(path, progress_callback)
 def _crop(image: Any,d: Detection,padding: float=0):
     h,w=image.shape[:2]; x1=max(0,d.x_min-padding*(d.x_max-d.x_min)); y1=max(0,d.y_min-padding*(d.y_max-d.y_min)); x2=min(1,d.x_max+padding*(d.x_max-d.x_min)); y2=min(1,d.y_max+padding*(d.y_max-d.y_min)); return image[int(y1*h):int(y2*h),int(x1*w):int(x2*w)],(x1,y1,x2,y2)
 def _map_pose(landmarks,box,shape):

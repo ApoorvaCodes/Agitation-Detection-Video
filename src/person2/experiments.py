@@ -20,6 +20,9 @@ from person2.embeddings import TemporalPoseEncoder, encoder_metadata
 from person2.io import save_prototypes
 from person2.pipeline import process_perception
 from person2.prototypes import build_prototypes
+from cmai.taxonomy import VERSION, require_initial_items
+from cmai.bundle import DetectorRule
+from cmai.detection import apply_rules, has_evidence
 
 
 class DatasetProvenance(Contract):
@@ -28,6 +31,7 @@ class DatasetProvenance(Contract):
     annotation_protocol: str = Field(min_length=1)
     annotation_version: str = Field(min_length=1)
     license_or_permission: str = Field(min_length=1)
+    label_agreement: str = Field(min_length=1)
 
 
 class LabelledChunk(Contract):
@@ -43,13 +47,19 @@ class LabelledChunk(Contract):
 
 
 class ExperimentManifest(Contract):
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["2.0"] = "2.0"
+    taxonomy_version: Literal["cmai-long-form-camera-v1"] = VERSION
+    detector_mode: Literal["pose_motion_camera"] = "pose_motion_camera"
     provenance: DatasetProvenance
     behaviours: list[str] = Field(min_length=1)
     records: list[LabelledChunk] = Field(min_length=1)
+    event_annotations: list[dict] = Field(default_factory=list)
+    reviewed_intervals: list[dict] = Field(default_factory=list)
+    chunk_configuration: Person2Config | None = None
 
     @model_validator(mode="after")
     def validate_labels(self):
+        require_initial_items(self.behaviours)
         if len(self.behaviours) != len(set(self.behaviours)) or any(not b.strip() for b in self.behaviours):
             raise ValueError("behaviours must be unique nonempty labels")
         for record in self.records:
@@ -57,6 +67,30 @@ class ExperimentManifest(Contract):
                 raise ValueError("record labels must be unique and belong to behaviours")
         if {r.split for r in self.records} != {"train", "validation", "test"}:
             raise ValueError("manifest needs train, validation, and test records")
+        if self.event_annotations:
+            from cmai.experiments import EventAnnotation
+            self.event_annotations = [EventAnnotation.model_validate(e).model_dump() for e in self.event_annotations]
+            videos = {(r.perception, r.person_id, r.split) for r in self.records}
+            for e in self.event_annotations:
+                if (e["perception"], e["person_id"], e["split"]) not in videos:
+                    raise ValueError("event annotation has no matching chunk records in its split")
+                if not set(e["labels"]) <= set(self.behaviours):
+                    raise ValueError("event label not declared in behaviours")
+            if not self.reviewed_intervals:
+                raise ValueError("event evaluation requires explicit reviewed recording intervals")
+        if self.reviewed_intervals:
+            from cmai.experiments import ReviewedInterval
+            self.reviewed_intervals = [ReviewedInterval.model_validate(r).model_dump() for r in self.reviewed_intervals]
+            videos = {(r.perception, r.person_id, r.split) for r in self.records}
+            if any((r["perception"], r["person_id"], r["split"]) not in videos for r in self.reviewed_intervals):
+                raise ValueError("reviewed interval has no matching recording records")
+            if len({e["annotation_id"] for e in self.event_annotations}) != len(self.event_annotations):
+                raise ValueError("event annotation IDs must be unique")
+            for e in self.event_annotations:
+                if not any((r["perception"], r["person_id"], r["split"]) == (e["perception"], e["person_id"], e["split"])
+                           and r["start_timestamp"] <= e["start_timestamp"] and r["end_timestamp"] >= e["end_timestamp"]
+                           for r in self.reviewed_intervals):
+                    raise ValueError("event outside reviewed recording intervals")
         return self
 
 
@@ -70,7 +104,7 @@ def runtime_metadata():
             "dependencies": {name: version(name) for name in ("numpy", "pydantic", "opencv-python", "pydantic-core",
                                                                "annotated-types", "typing-extensions", "typing-inspection")},
             "code_sha256": {f"{p.parent.name}/{p.name}": content_hash(p)
-                            for p in sorted(package.parent.glob("person[12]/*.py"))}}
+                            for p in sorted([*package.parent.glob("person[12]/*.py"), *package.parent.glob("cmai/*.py")])}}
 
 
 def validate_split_integrity(manifest, base):
@@ -172,7 +206,7 @@ def experiment_variants(config, temporal_bins):
 
 LIMITATIONS = [
     "No clinical validation, calibrated probability, or claim of a best model.",
-    "Chunk metrics assess annotated candidate support, not verified clinical behaviour or event localization.",
+    "Chunk and optional event timing metrics assess visible candidate support, not clinically validated behaviour.",
     "Overlapping chunks are correlated; bootstrap confidence intervals are not estimated.",
     "Subject/session IDs and annotation provenance are supplied by the dataset owner and must be audited.",
     "Prototypes and temporal bins are engineering baselines, not pretrained or trained deep action models.",
@@ -186,7 +220,8 @@ def run_experiments(manifest_path, output_dir, config=None, thresholds=(.6, .7, 
     thresholds = sorted(set(thresholds))
     if not thresholds or any(not -1 <= t <= 1 for t in thresholds):
         raise ValueError("threshold grid must contain finite values in [-1,1]")
-    report = {"schema_version": "1.0", "status": "pending_labelled_data", "runtime": runtime_metadata(),
+    report = {"schema_version": "2.0", "taxonomy_version": VERSION,
+              "status": "pending_labelled_data", "runtime": runtime_metadata(),
               "base_configuration": asdict(config), "threshold_grid": thresholds,
               "variants": {name: {"configuration": asdict(cfg), "pose_identity":
                                    (encoder.identity if encoder else {"model": "pose_stats", "version": "1"}),
@@ -198,10 +233,14 @@ def run_experiments(manifest_path, output_dir, config=None, thresholds=(.6, .7, 
     else:
         manifest_path = Path(manifest_path)
         manifest = ExperimentManifest.model_validate_json(manifest_path.read_text())
+        if manifest.chunk_configuration is not None and asdict(manifest.chunk_configuration) != asdict(config):
+            raise ValueError("configuration differs from annotation chunk preparation; prepare the manifest again")
         sources, audit = validate_split_integrity(manifest, manifest_path.parent)
         report.update({"status": "evaluated", "dataset_provenance": manifest.provenance.model_dump(),
                        "manifest_sha256": content_hash(manifest_path), "split_audit": audit,
-                       "behaviours": manifest.behaviours})
+                       "behaviours": manifest.behaviours, "event_annotations": manifest.event_annotations,
+                       "reviewed_intervals": manifest.reviewed_intervals,
+                       "annotation_chunk_configuration": asdict(manifest.chunk_configuration) if manifest.chunk_configuration else None})
         output_dir.mkdir(parents=True, exist_ok=True)
         for name, cfg, encoder in variants:
             extracted = {p: process_perception(source, cfg, pose_encoder=encoder) for p, source in sources.items()}
@@ -214,7 +253,13 @@ def run_experiments(manifest_path, output_dir, config=None, thresholds=(.6, .7, 
                     if chunk.status == "low_quality" or not any(chunk.fused_embedding.valid):
                         unusable.append(record.annotation_id)
                     else:
-                        examples.extend((label, chunk.fused_embedding) for label in record.labels)
+                        source = sources[(manifest_path.parent / record.perception).resolve()]
+                        person = next(p for p in source.persons if p.person_id == record.person_id)
+                        for label in record.labels:
+                            if has_evidence(person.observations, chunk, DetectorRule(item_id=label, similarity_threshold=cfg.similarity_threshold)):
+                                examples.append((label, chunk.fused_embedding))
+                            else:
+                                unusable.append(f"{record.annotation_id}:{label}:missing_required_camera_evidence")
             if {label for label, _ in examples} != set(manifest.behaviours):
                 report["variants"][name].update({"status": "pending_usable_training_examples",
                                                 "unusable_training_annotations": unusable})
@@ -224,11 +269,16 @@ def run_experiments(manifest_path, output_dir, config=None, thresholds=(.6, .7, 
 
             def infer(split, threshold):
                 paths = {(manifest_path.parent / r.perception).resolve() for r in manifest.records if r.split == split}
-                results = {p: process_perception(sources[p], replace(cfg, similarity_threshold=threshold),
-                                                 prototypes=bank, pose_encoder=encoder) for p in sorted(paths)}
+                rules = [DetectorRule(item_id=b, similarity_threshold=threshold) for b in manifest.behaviours]
+                results = {p: apply_rules(process_perception(sources[p], replace(cfg, similarity_threshold=threshold),
+                                                 prototypes=bank, pose_encoder=encoder), rules, sources[p]) for p in sorted(paths)}
                 rows = [(r, chunk_for(results[(manifest_path.parent / r.perception).resolve()], r))
                         for r in manifest.records if r.split == split]
-                return evaluate(rows, manifest.behaviours)
+                metrics, predictions = evaluate(rows, manifest.behaviours)
+                if manifest.event_annotations:
+                    from cmai.experiments import evaluate_events
+                    metrics["events"] = evaluate_events(results, manifest, manifest_path.parent, split)
+                return metrics, predictions
 
             validation = [(t, *infer("validation", t)) for t in thresholds]
             eligible = [(t, m, predictions) for t, m, predictions in validation
@@ -238,12 +288,18 @@ def run_experiments(manifest_path, output_dir, config=None, thresholds=(.6, .7, 
                                                 "validation_grid": [{"threshold": t, "metrics": m} for t, m, _ in validation]})
                 continue
             # Deterministic tie break favors the higher threshold; never inspect test to tune.
-            chosen, val_metrics, val_predictions = max(eligible, key=lambda item: (item[1]["micro"]["f1"], item[0]))
+            metric_key = lambda m: m.get("events", {}).get("micro_f1", m["micro"]["f1"])
+            eligible = [row for row in eligible if metric_key(row[1]) is not None]
+            if not eligible:
+                report["variants"][name].update(status="pending_usable_validation_events")
+                continue
+            chosen, val_metrics, val_predictions = max(eligible, key=lambda item: (metric_key(item[1]), item[0]))
             test_metrics, test_predictions = infer("test", chosen)
             first = next(iter(extracted.values()))
             report["variants"][name] = {"status": "evaluated", "configuration": asdict(replace(cfg, similarity_threshold=chosen)),
                                          "encoder_metadata": encoder_metadata(first, encoder),
                                          "selected_threshold": chosen, "threshold_selection_split": "validation",
+                                         "detector_rules": [DetectorRule(item_id=b, similarity_threshold=chosen).model_dump() for b in manifest.behaviours],
                                          "validation_grid": [{"threshold": t, "metrics": m} for t, m, _ in validation],
                                          "metrics": {"validation": val_metrics, "test": test_metrics},
                                          "predictions": {"validation": val_predictions, "test": test_predictions},

@@ -1,0 +1,106 @@
+{
+  "$defs": {
+    "CameraItem": {
+      "additionalProperties": false,
+      "properties": {
+        "item_id": {
+          "title": "Item Id",
+          "type": "string"
+        },
+        "item_number": {
+          "maximum": 29,
+          "minimum": 1,
+          "title": "Item Number",
+          "type": "integer"
+        },
+        "display_name": {
+          "minLength": 1,
+          "title": "Display Name",
+          "type": "string"
+        },
+        "camera_status": {
+          "enum": [
+            "camera_candidate",
+            "conditional",
+            "fall_like_only",
+            "not_camera_only",
+            "out_of_initial_scope"
+          ],
+          "title": "Camera Status",
+          "type": "string"
+        },
+        "positive_definition": {
+          "minLength": 1,
+          "title": "Positive Definition",
+          "type": "string"
+        },
+        "exclusions": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Exclusions",
+          "type": "array"
+        },
+        "evidence_needs": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Needs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "item_id",
+        "item_number",
+        "display_name",
+        "camera_status",
+        "positive_definition",
+        "exclusions",
+        "evidence_needs"
+      ],
+      "title": "CameraItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "taxonomy_version": {
+      "const": "cmai-long-form-camera-v1",
+      "title": "Taxonomy Version",
+      "type": "string"
+    },
+    "form": {
+      "const": "CMAI 29-item long form",
+      "title": "Form",
+      "type": "string"
+    },
+    "edition": {
+      "minLength": 1,
+      "title": "Edition",
+      "type": "string"
+    },
+    "source": {
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/CameraItem"
+      },
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "taxonomy_version",
+    "form",
+    "edition",
+    "source",
+    "items"
+  ],
+  "title": "CameraTaxonomy",
+  "type": "object"
+}

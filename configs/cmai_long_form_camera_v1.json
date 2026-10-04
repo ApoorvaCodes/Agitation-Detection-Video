@@ -1,0 +1,443 @@
+{
+  "taxonomy_version": "cmai-long-form-camera-v1",
+  "form": "CMAI 29-item long form",
+  "edition": "29-item numbering supplied in IMPLEMENTATION.md; exact manual edition pending dataset-owner verification",
+  "source": "User-supplied engineering scope map in IMPLEMENTATION.md; long-form numbering cross-check: https://pmc.ncbi.nlm.nih.gov/articles/PMC10376951/",
+  "items": [
+    {
+      "item_id": "cmai_01_pacing_aimless_wandering",
+      "item_number": 1,
+      "display_name": "Pacing, aimless wandering",
+      "camera_status": "conditional",
+      "positive_definition": "Repeated back-and-forth walking or repeated traversal of the same visible path.",
+      "exclusions": [
+        "Repeated paths or back-and-forth walking; camera cannot establish aimlessness or exclude purposeful walking without context.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Repeated paths or back-and-forth walking; camera cannot establish aimlessness or exclude purposeful walking without context.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_02_inappropriate_dressing_disrobing",
+      "item_number": 2,
+      "display_name": "Inappropriate dressing or disrobing",
+      "camera_status": "out_of_initial_scope",
+      "positive_definition": "Requires a separate annotation protocol and the non-camera/context evidence described below; no camera-only positive definition is enabled.",
+      "exclusions": [
+        "Social appropriateness needs context; do not infer nudity or sexual behaviour from appearance alone.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Social appropriateness needs context; do not infer nudity or sexual behaviour from appearance alone.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_03_spitting",
+      "item_number": 3,
+      "display_name": "Spitting",
+      "camera_status": "conditional",
+      "positive_definition": "Visible expulsion from the mouth with an observable trajectory.",
+      "exclusions": [
+        "Visible expulsion event; may be occluded and cannot always distinguish spitting from other mouth actions.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Visible expulsion event; may be occluded and cannot always distinguish spitting from other mouth actions.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_04_cursing_verbal_aggression",
+      "item_number": 4,
+      "display_name": "Cursing or verbal aggression",
+      "camera_status": "not_camera_only",
+      "positive_definition": "Requires a separate annotation protocol and the non-camera/context evidence described below; no camera-only positive definition is enabled.",
+      "exclusions": [
+        "Requires intelligible speech/audio.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Requires intelligible speech/audio.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_05_unwarranted_attention_help_requests",
+      "item_number": 5,
+      "display_name": "Unwarranted requests for attention/help",
+      "camera_status": "not_camera_only",
+      "positive_definition": "Requires a separate annotation protocol and the non-camera/context evidence described below; no camera-only positive definition is enabled.",
+      "exclusions": [
+        "Usually requires speech and context about whether a request is warranted.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Usually requires speech and context about whether a request is warranted.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_06_repetitive_sentences_questions",
+      "item_number": 6,
+      "display_name": "Repetitive sentences or questions",
+      "camera_status": "not_camera_only",
+      "positive_definition": "Requires a separate annotation protocol and the non-camera/context evidence described below; no camera-only positive definition is enabled.",
+      "exclusions": [
+        "Requires speech/audio and language-level repetition.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Requires speech/audio and language-level repetition.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_07_hitting",
+      "item_number": 7,
+      "display_name": "Hitting",
+      "camera_status": "conditional",
+      "positive_definition": "Visible striking movement with contact on a person or own body.",
+      "exclusions": [
+        "Visible striking action and target; self-hitting needs a clear body-part interaction.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Visible striking action and target; self-hitting needs a clear body-part interaction.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_08_kicking",
+      "item_number": 8,
+      "display_name": "Kicking",
+      "camera_status": "conditional",
+      "positive_definition": "Visible forceful foot movement with a target and contact.",
+      "exclusions": [
+        "Visible forceful foot action and target/object.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Visible forceful foot action and target/object.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_09_grabbing",
+      "item_number": 9,
+      "display_name": "Grabbing onto people or things inappropriately",
+      "camera_status": "conditional",
+      "positive_definition": "Visible grasp followed by snatching or yanking a person or object.",
+      "exclusions": [
+        "Visible snatching/yanking or grasp; appropriateness and ownership may be unknown.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Visible snatching/yanking or grasp; appropriateness and ownership may be unknown.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_10_pushing",
+      "item_number": 10,
+      "display_name": "Pushing",
+      "camera_status": "conditional",
+      "positive_definition": "Visible hand/body contact followed by displacement of another person.",
+      "exclusions": [
+        "Visible forceful contact and displacement of another person.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Visible forceful contact and displacement of another person.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_11_throwing_things",
+      "item_number": 11,
+      "display_name": "Throwing things",
+      "camera_status": "conditional",
+      "positive_definition": "Visible release and propelled object trajectory.",
+      "exclusions": [
+        "Requires object tracking and evidence that an object was propelled, not merely dropped.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Requires object tracking and evidence that an object was propelled, not merely dropped.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_12_strange_noises",
+      "item_number": 12,
+      "display_name": "Strange noises",
+      "camera_status": "not_camera_only",
+      "positive_definition": "Requires a separate annotation protocol and the non-camera/context evidence described below; no camera-only positive definition is enabled.",
+      "exclusions": [
+        "Audio is required.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Audio is required.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_13_screaming",
+      "item_number": 13,
+      "display_name": "Screaming",
+      "camera_status": "not_camera_only",
+      "positive_definition": "Requires a separate annotation protocol and the non-camera/context evidence described below; no camera-only positive definition is enabled.",
+      "exclusions": [
+        "Audio is required.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Audio is required.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_14_biting",
+      "item_number": 14,
+      "display_name": "Biting",
+      "camera_status": "conditional",
+      "positive_definition": "Visible mouth contact on a person or object consistent with biting.",
+      "exclusions": [
+        "Requires visible contact; intent and target may be ambiguous.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Requires visible contact; intent and target may be ambiguous.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_15_scratching",
+      "item_number": 15,
+      "display_name": "Scratching",
+      "camera_status": "conditional",
+      "positive_definition": "Visible repeated fingernail movement in contact with a target.",
+      "exclusions": [
+        "Requires clear contact/action; small movements and occlusion make this difficult.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Requires clear contact/action; small movements and occlusion make this difficult.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_16_trying_to_get_different_place",
+      "item_number": 16,
+      "display_name": "Trying to get to a different place",
+      "camera_status": "conditional",
+      "positive_definition": "Repeated approaches to a configured exit or room boundary.",
+      "exclusions": [
+        "Can flag repeated approach/exit attempts if room boundaries are configured; intent/context are not inherent in trajectory.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Can flag repeated approach/exit attempts if room boundaries are configured; intent/context are not inherent in trajectory.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_17_intentional_falling",
+      "item_number": 17,
+      "display_name": "Intentional falling",
+      "camera_status": "fall_like_only",
+      "positive_definition": "Visible rapid downward body transition consistent with a fall-like event; intent remains unknown.",
+      "exclusions": [
+        "Camera may flag a fall-like transition; it cannot establish that the fall was intentional.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Camera may flag a fall-like transition; it cannot establish that the fall was intentional.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_18_complaining",
+      "item_number": 18,
+      "display_name": "Complaining",
+      "camera_status": "not_camera_only",
+      "positive_definition": "Requires a separate annotation protocol and the non-camera/context evidence described below; no camera-only positive definition is enabled.",
+      "exclusions": [
+        "Speech/audio and semantic interpretation are required.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Speech/audio and semantic interpretation are required.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_19_negativism",
+      "item_number": 19,
+      "display_name": "Negativism",
+      "camera_status": "not_camera_only",
+      "positive_definition": "Requires a separate annotation protocol and the non-camera/context evidence described below; no camera-only positive definition is enabled.",
+      "exclusions": [
+        "Requires interaction context and often speech; refusal cannot be inferred from posture alone.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Requires interaction context and often speech; refusal cannot be inferred from posture alone.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_20_inappropriate_substance_ingestion",
+      "item_number": 20,
+      "display_name": "Eating/drinking inappropriate substances",
+      "camera_status": "out_of_initial_scope",
+      "positive_definition": "Requires a separate annotation protocol and the non-camera/context evidence described below; no camera-only positive definition is enabled.",
+      "exclusions": [
+        "Requires object identity and ingestion evidence; appropriateness depends on context.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Requires object identity and ingestion evidence; appropriateness depends on context.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_21_hurting_self_or_another",
+      "item_number": 21,
+      "display_name": "Hurting self or another",
+      "camera_status": "conditional",
+      "positive_definition": "Visible interaction with a potentially harmful object and contact on a person.",
+      "exclusions": [
+        "Flag only clearly visible harmful-object interaction; do not infer injury or harm from proximity alone.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Flag only clearly visible harmful-object interaction; do not infer injury or harm from proximity alone.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_22_inappropriate_handling",
+      "item_number": 22,
+      "display_name": "Handling things inappropriately",
+      "camera_status": "conditional",
+      "positive_definition": "Visible manipulation of a tracked object; appropriateness remains unknown.",
+      "exclusions": [
+        "Object interaction may be visible; ownership and appropriateness need scene context.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Object interaction may be visible; ownership and appropriateness need scene context.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_23_hiding_things",
+      "item_number": 23,
+      "display_name": "Hiding things",
+      "camera_status": "conditional",
+      "positive_definition": "Visible object placement followed by object disappearance at the placement location.",
+      "exclusions": [
+        "Requires persistent object tracking and evidence that an object was deliberately put out of sight.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Requires persistent object tracking and evidence that an object was deliberately put out of sight.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_24_hoarding_things",
+      "item_number": 24,
+      "display_name": "Hoarding things",
+      "camera_status": "out_of_initial_scope",
+      "positive_definition": "Requires a separate annotation protocol and the non-camera/context evidence described below; no camera-only positive definition is enabled.",
+      "exclusions": [
+        "Requires longer-term context and knowledge of what is an inappropriate quantity.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Requires longer-term context and knowledge of what is an inappropriate quantity.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_25_tearing_destroying_property",
+      "item_number": 25,
+      "display_name": "Tearing things/destroying property",
+      "camera_status": "conditional",
+      "positive_definition": "Visible tearing/breaking action with resulting object damage.",
+      "exclusions": [
+        "Requires object-level evidence of destructive interaction and resulting damage.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Requires object-level evidence of destructive interaction and resulting damage.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_26_repetitious_mannerisms",
+      "item_number": 26,
+      "display_name": "Repetitious mannerisms",
+      "camera_status": "camera_candidate",
+      "positive_definition": "At least two repeated cycles of visible body or object movement such as rocking or tapping.",
+      "exclusions": [
+        "Repeated body/object movement over time, such as rocking or tapping; repeated speech is excluded.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Repeated body/object movement over time, such as rocking or tapping; repeated speech is excluded.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_27_verbal_sexual_advances",
+      "item_number": 27,
+      "display_name": "Verbal sexual advances",
+      "camera_status": "not_camera_only",
+      "positive_definition": "Requires a separate annotation protocol and the non-camera/context evidence described below; no camera-only positive definition is enabled.",
+      "exclusions": [
+        "Requires speech/audio.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Requires speech/audio.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_28_physical_sexual_advances",
+      "item_number": 28,
+      "display_name": "Physical sexual advances/exposing genitals",
+      "camera_status": "out_of_initial_scope",
+      "positive_definition": "Requires a separate annotation protocol and the non-camera/context evidence described below; no camera-only positive definition is enabled.",
+      "exclusions": [
+        "Requires sensitive interpretation and context; do not enable automatic detection in the initial camera scope.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Requires sensitive interpretation and context; do not enable automatic detection in the initial camera scope.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    },
+    {
+      "item_id": "cmai_29_general_restlessness",
+      "item_number": 29,
+      "display_name": "General restlessness",
+      "camera_status": "camera_candidate",
+      "positive_definition": "Repeated sit/stand transitions or sustained movement while seated, with visible posture.",
+      "exclusions": [
+        "Repeated sit/stand transitions or movement while seated, with posture visibility and duration evidence.",
+        "Do not infer intent, diagnosis, agitation cause, injury, social appropriateness, or caregiver frequency from movement alone."
+      ],
+      "evidence_needs": [
+        "Repeated sit/stand transitions or movement while seated, with posture visibility and duration evidence.",
+        "Timestamped source frames for the same session-local track; record missing or occluded evidence as uncertain."
+      ]
+    }
+  ]
+}

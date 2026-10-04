@@ -27,6 +27,11 @@
           "minLength": 1,
           "title": "License Or Permission",
           "type": "string"
+        },
+        "label_agreement": {
+          "minLength": 1,
+          "title": "Label Agreement",
+          "type": "string"
         }
       },
       "required": [
@@ -34,7 +39,8 @@
         "source",
         "annotation_protocol",
         "annotation_version",
-        "license_or_permission"
+        "license_or_permission",
+        "label_agreement"
       ],
       "title": "DatasetProvenance",
       "type": "object"
@@ -101,14 +107,92 @@
       ],
       "title": "LabelledChunk",
       "type": "object"
+    },
+    "Person2Config": {
+      "properties": {
+        "window_seconds": {
+          "default": 2.0,
+          "title": "Window Seconds",
+          "type": "number"
+        },
+        "overlap": {
+          "default": 0.5,
+          "title": "Overlap",
+          "type": "number"
+        },
+        "max_gap_seconds": {
+          "default": 1.0,
+          "title": "Max Gap Seconds",
+          "type": "number"
+        },
+        "min_frames": {
+          "default": 3,
+          "title": "Min Frames",
+          "type": "integer"
+        },
+        "min_valid_fraction": {
+          "default": 0.6,
+          "title": "Min Valid Fraction",
+          "type": "number"
+        },
+        "min_shared_fraction": {
+          "default": 0.5,
+          "title": "Min Shared Fraction",
+          "type": "number"
+        },
+        "similarity_threshold": {
+          "default": 0.8,
+          "title": "Similarity Threshold",
+          "type": "number"
+        },
+        "smoothing_alpha": {
+          "default": 0.5,
+          "title": "Smoothing Alpha",
+          "type": "number"
+        },
+        "min_event_seconds": {
+          "default": 1.0,
+          "title": "Min Event Seconds",
+          "type": "number"
+        },
+        "pose_weight": {
+          "default": 1.0,
+          "title": "Pose Weight",
+          "type": "number"
+        },
+        "motion_weight": {
+          "default": 1.0,
+          "title": "Motion Weight",
+          "type": "number"
+        },
+        "video_weight": {
+          "default": 1.0,
+          "title": "Video Weight",
+          "type": "number"
+        }
+      },
+      "title": "Person2Config",
+      "type": "object"
     }
   },
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "const": "1.0",
-      "default": "1.0",
+      "const": "2.0",
+      "default": "2.0",
       "title": "Schema Version",
+      "type": "string"
+    },
+    "taxonomy_version": {
+      "const": "cmai-long-form-camera-v1",
+      "default": "cmai-long-form-camera-v1",
+      "title": "Taxonomy Version",
+      "type": "string"
+    },
+    "detector_mode": {
+      "const": "pose_motion_camera",
+      "default": "pose_motion_camera",
+      "title": "Detector Mode",
       "type": "string"
     },
     "provenance": {
@@ -129,6 +213,33 @@
       "minItems": 1,
       "title": "Records",
       "type": "array"
+    },
+    "event_annotations": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Event Annotations",
+      "type": "array"
+    },
+    "reviewed_intervals": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Reviewed Intervals",
+      "type": "array"
+    },
+    "chunk_configuration": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Person2Config"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

@@ -1,0 +1,170 @@
+{
+  "schema_version": "2.0",
+  "taxonomy_version": "cmai-long-form-camera-v1",
+  "status": "pending_labelled_data",
+  "runtime": {
+    "python": "3.11.15",
+    "platform": "macOS-26.3-arm64-arm-64bit",
+    "dependencies": {
+      "numpy": "1.26.4",
+      "pydantic": "2.13.5",
+      "opencv-python": "4.11.0.86",
+      "pydantic-core": "2.46.5",
+      "annotated-types": "0.8.0",
+      "typing-extensions": "4.16.0",
+      "typing-inspection": "0.4.4"
+    },
+    "code_sha256": {
+      "cmai/__init__.py": "5ffa38e21722033b431ab2fbcaed6f04c57e461ad4221cfb79a3b876eb0d1918",
+      "cmai/bundle.py": "1df557a371b3de64696e54a7d38d274aaa59ee15f25da7eacd1eedc0880d816c",
+      "cmai/contracts.py": "47070aa5879e877346664cbd97532b56962fd23f44b28e65c1896eb3bdf26e75",
+      "cmai/detection.py": "039a406282fc33a19530a8b68e3abfd5f60d5cb123473de7eae2dbc3fef15f1b",
+      "cmai/experiments.py": "b3e089f3a86ce75427c86880f9cb83522a4d58aa760e5c66e17f12c3e90bf7fe",
+      "cmai/jobs.py": "627d2f9785a15d722402679fac0c142fbd5af00ab8876d75e92c24c5a51bd168",
+      "cmai/results.py": "11a0afd4c8a7e2ce0c2d537fbc195ef18170c7d9b7d0701d6177c8b1672a19e5",
+      "cmai/taxonomy.py": "0d4d94b0f6355573d9f52d714528ce7381df29c05b2ba14c86f2f74c3ebca465",
+      "cmai/worker.py": "53d8f67686dd213a4751144ef868a1ab88eecb174880ea4023d48ac9a3997ba6",
+      "person1/__init__.py": "9b677564b05aba5492f2ead217eb88689c2e3a157fad2c10e4562cc72f1d22b0",
+      "person1/cli.py": "28a79554e4b288fb5f76d9d5535a24607a5171bcf60d00ca20c4b8ae355190ae",
+      "person1/config.py": "e0df39ae283e28d34fae87774178774e9927760fed37026e24b9edba14700258",
+      "person1/contracts.py": "4af40e24d36631fe5b115936f6b4acb1ab6aafbbfe88f2df69eac3a1a3a1308c",
+      "person1/errors.py": "3b3a8e1d779e160ab3a98714b5da4d325ca07713e4db0f02b41a8095b0d1b6b7",
+      "person1/features.py": "2c2ef0b4bd8699aa57332b23b694a219aa4ba30b52d6a37676afb83a845e07f9",
+      "person1/ingestion.py": "6568fb11b4de6d1e0c327a7a48c57cec9f3091c06abc4f6ea1d2123763f37fdd",
+      "person1/io.py": "7e1f7d6ebdbe46d2081b19910883a056a6e71951ff58f0a379fd5defaf557982",
+      "person1/overlay.py": "c236f04cb0ede1f6a88e4bafe72875321a0e88e7e52485f860e041fb9c90c3fd",
+      "person1/perception.py": "b9d0537f26834837ffa3d14e0eaa79010a9199702d4642570ef57a51fc68095a",
+      "person1/pipeline.py": "ad47a880045ecf85f6b3aa7e7039c7106ebdaaa6343f75a90d70be0c73728d7f",
+      "person1/tracking.py": "1cb00989a33eab803c4758db0143b09a8110adb595c34d8f6b873fad5074c2e0",
+      "person2/__init__.py": "ee9feb22842a39c2fbbfe88f3d822036a623a992f12daf735e4767743b5761bb",
+      "person2/chunking.py": "d9ab6cfa1500be4325c2777039b5ee21c006241920a75bfb670c5493c281e2ba",
+      "person2/cli.py": "6966201e7ce0b200d7892d7e3f87ab81b5c541e6e63e7c965cfa862581b02780",
+      "person2/config.py": "6855eb2eccb1fb644acabb15ad285f3c08cb33d260ac067bff2197de8a437bec",
+      "person2/contracts.py": "7cfd8cb1d4fe229a37b405cde529ec5e4b320033d68df630e930430b1488c2ee",
+      "person2/embeddings.py": "3884dcd4fe0f4cfee3be14f0fc18b0b27f1dc40ce5e22de7355a1bc3e3b2cdd1",
+      "person2/experiments.py": "00a4b812ff6e27560a186001669cf9e630c6117b43333ef1c9cb279325d7c5b5",
+      "person2/io.py": "5cff2c57d82769252eaf5666f77dc4e5df0f79ee0573e5887b14a8fd7c35be1d",
+      "person2/pipeline.py": "332417aa02adf1e10c9db084f279aade3a24726494379213f67f8606a9320681",
+      "person2/prototypes.py": "14b4d987e4bfd8a195682498283774d8a3d6487997c2692404ea71b05b1a03ed"
+    }
+  },
+  "base_configuration": {
+    "window_seconds": 2.0,
+    "overlap": 0.5,
+    "max_gap_seconds": 1.0,
+    "min_frames": 3,
+    "min_valid_fraction": 0.6,
+    "min_shared_fraction": 0.5,
+    "similarity_threshold": 0.8,
+    "smoothing_alpha": 0.5,
+    "min_event_seconds": 1.0,
+    "pose_weight": 1.0,
+    "motion_weight": 1.0,
+    "video_weight": 1.0
+  },
+  "threshold_grid": [
+    0.6,
+    0.7,
+    0.8,
+    0.9
+  ],
+  "variants": {
+    "pose_only": {
+      "configuration": {
+        "window_seconds": 2.0,
+        "overlap": 0.5,
+        "max_gap_seconds": 1.0,
+        "min_frames": 3,
+        "min_valid_fraction": 0.6,
+        "min_shared_fraction": 0.5,
+        "similarity_threshold": 0.8,
+        "smoothing_alpha": 0.5,
+        "min_event_seconds": 1.0,
+        "pose_weight": 1,
+        "motion_weight": 0,
+        "video_weight": 0
+      },
+      "pose_identity": {
+        "model": "pose_stats",
+        "version": "1"
+      },
+      "metrics": null
+    },
+    "motion_only": {
+      "configuration": {
+        "window_seconds": 2.0,
+        "overlap": 0.5,
+        "max_gap_seconds": 1.0,
+        "min_frames": 3,
+        "min_valid_fraction": 0.6,
+        "min_shared_fraction": 0.5,
+        "similarity_threshold": 0.8,
+        "smoothing_alpha": 0.5,
+        "min_event_seconds": 1.0,
+        "pose_weight": 0,
+        "motion_weight": 1,
+        "video_weight": 0
+      },
+      "pose_identity": {
+        "model": "pose_stats",
+        "version": "1"
+      },
+      "metrics": null
+    },
+    "pose_plus_motion": {
+      "configuration": {
+        "window_seconds": 2.0,
+        "overlap": 0.5,
+        "max_gap_seconds": 1.0,
+        "min_frames": 3,
+        "min_valid_fraction": 0.6,
+        "min_shared_fraction": 0.5,
+        "similarity_threshold": 0.8,
+        "smoothing_alpha": 0.5,
+        "min_event_seconds": 1.0,
+        "pose_weight": 1,
+        "motion_weight": 1,
+        "video_weight": 0
+      },
+      "pose_identity": {
+        "model": "pose_stats",
+        "version": "1"
+      },
+      "metrics": null
+    },
+    "temporal_pose_plus_motion": {
+      "configuration": {
+        "window_seconds": 2.0,
+        "overlap": 0.5,
+        "max_gap_seconds": 1.0,
+        "min_frames": 3,
+        "min_valid_fraction": 0.6,
+        "min_shared_fraction": 0.5,
+        "similarity_threshold": 0.8,
+        "smoothing_alpha": 0.5,
+        "min_event_seconds": 1.0,
+        "pose_weight": 1,
+        "motion_weight": 1,
+        "video_weight": 0
+      },
+      "pose_identity": {
+        "model": "pose_time_bins",
+        "version": "1",
+        "bins": 4,
+        "window_seconds": 2.0,
+        "preprocessing": "masked_means_no_interpolation"
+      },
+      "metrics": null
+    }
+  },
+  "limitations": [
+    "No clinical validation, calibrated probability, or claim of a best model.",
+    "Chunk and optional event timing metrics assess visible candidate support, not clinically validated behaviour.",
+    "Overlapping chunks are correlated; bootstrap confidence intervals are not estimated.",
+    "Subject/session IDs and annotation provenance are supplied by the dataset owner and must be audited.",
+    "Prototypes and temporal bins are engineering baselines, not pretrained or trained deep action models.",
+    "Model selection remains provisional until representative data and independent replication are available."
+  ],
+  "selection": null,
+  "reason": "No labelled manifest supplied. No training, evaluation, or model ranking performed."
+}

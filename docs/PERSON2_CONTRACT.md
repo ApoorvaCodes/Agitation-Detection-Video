@@ -213,7 +213,7 @@ Create a manifest (paths are relative to the manifest file):
 
 ```json
 [
-  {"result": "training.behaviours.json", "chunk_id": "1:0", "behaviour": "general_restlessness", "split": "train"}
+  {"result": "training.behaviours.json", "chunk_id": "1:0", "behaviour": "cmai_29_general_restlessness", "split": "train"}
 ]
 ```
 
@@ -227,8 +227,11 @@ Replace the illustrative chunk ID with an actual output ID. Quality-gated
 chunks are rejected by the CLI prototype builder. Optional video must be used
 consistently for both extraction and evaluation. CLI and schema validation errors
 exit nonzero; an empty track produces empty chunks and events.
-An omitted `split` remains an implicit training declaration for compatibility
-with the original prototype manifest; an explicit validation/test split is
+A missing `split` is rejected; an explicit validation/test split is
 rejected. Never supply held-out annotations to this builder. The experiment
 runner uses a separate manifest with required, audited train/validation/test
 assignments and uses only its training rows for prototype construction.
+
+## CMAI camera companion and training labels
+
+P1/P2 result and prototype handoffs remain schema `1.0`. The camera application adds `cmai-camera-result-1.0` as a separate companion; see [camera contract](CMAI_CAMERA.md). New training manifests require explicit training splits and canonical item IDs (`cmai_01_pacing_aimless_wandering`, `cmai_26_repetitious_mannerisms`, `cmai_29_general_restlessness`). Old starter aliases migrate only during explicit result/bank review, not as newly labelled training manifests. The standalone prototype builder no longer defaults omitted splits to training. Experimental manifests use schema `2.0` and require taxonomy, detector mode, permissions and label-agreement provenance.

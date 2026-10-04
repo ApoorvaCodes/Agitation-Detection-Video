@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "taxonomy_version": "cmai-long-form-camera-v1",
+  "detector_id": "pose-motion-prototype-baseline",
+  "version": "1.0-unavailable",
+  "mode": "unavailable",
+  "configuration": {
+    "window_seconds": 2.0,
+    "overlap": 0.5,
+    "max_gap_seconds": 1.0,
+    "min_frames": 3,
+    "min_valid_fraction": 0.6,
+    "min_shared_fraction": 0.5,
+    "similarity_threshold": 0.8,
+    "smoothing_alpha": 0.5,
+    "min_event_seconds": 1.0,
+    "pose_weight": 1.0,
+    "motion_weight": 1.0,
+    "video_weight": 0
+  },
+  "pose_representation": "stats",
+  "temporal_bins": 4,
+  "prototype_file": null,
+  "prototype_sha256": null,
+  "rules": [],
+  "release_evidence": null
+}
