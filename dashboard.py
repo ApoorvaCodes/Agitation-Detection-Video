@@ -25,13 +25,14 @@ from cmai.bundle import load_bundle, research_override, legacy_result_bundle
 from cmai.taxonomy import load_taxonomy
 from cmai.results import (build_camera_result, review_event, create_evidence, export_archive, attach_machine_reviews)
 from cmai.jobs import start_analysis
+from cmai.interactions import InteractionEvidence
 
 
 def clear_results():
     job = st.session_state.pop("analysis_job", None)
     if job:
         job.cancel()
-    for name in ("p1", "p2", "events", "camera_result", "active_bundle", "selected_person", "matching_video", "video_sha256", "analysis_message", "clip_path", "clip_event_id"):
+    for name in ("p1", "p2", "events", "camera_result", "action_assessments", "active_bundle", "selected_person", "matching_video", "video_sha256", "analysis_message", "clip_path", "clip_event_id"):
         st.session_state.pop(name, None)
     directory = st.session_state.pop("source_directory", None)
     if directory:
@@ -42,8 +43,11 @@ def clear_results():
 def render_camera_result(p1, p2, bundle):
     if "camera_result" not in st.session_state:
         st.session_state.camera_result = build_camera_result(p1, p2, bundle,
-            source_sha256=st.session_state.get("video_sha256"))
+            source_sha256=st.session_state.get("video_sha256"), action_assessments=st.session_state.get("action_assessments"))
     result = st.session_state.camera_result
+    if result.action_assessments is not None:
+        with st.expander("Action target/contact checks and abstentions"):
+            st.json(result.action_assessments.model_dump(mode="json"))
     taxonomy = load_taxonomy()
     names = {i.item_id: i.display_name for i in taxonomy.items}
     st.subheader("CMAI camera coverage")
@@ -133,6 +137,7 @@ def poll_analysis():
             st.info("Analysis cancelled; partial results discarded.")
     elif status["phase"] == "complete":
         st.session_state.p1, st.session_state.p2 = job.results()
+        st.session_state.action_assessments = job.action_assessments() if hasattr(job, "action_assessments") else None
         st.session_state.pop("analysis_job", None)
         st.session_state.analysis_message = "Video analysis completed."
         st.rerun()
@@ -180,6 +185,11 @@ def main():
     mode = st.radio("Input", ["Video", "Existing results (advanced)"], horizontal=True)
     video_file = st.file_uploader("Upload video", type=["mp4", "avi", "mov", "mkv", "webm"], key="source_video")
     p1_file = p2_file = prototypes_file = None
+    interaction_file = None
+    if default_bundle.metadata.detector_mode == "interaction_actions":
+        with st.expander("Target/contact evidence (research)"):
+            st.caption("Hitting/kicking require independently reviewed or externally detected target/contact evidence. Proximity is insufficient; missing evidence causes abstention.")
+            interaction_file = st.file_uploader("Interaction evidence JSON", type="json", key="interaction_evidence")
     if mode == "Video":
         with st.expander("Behaviour references (optional)"):
             st.write("Upload a prototype bank built from labelled training examples to detect behaviour candidates.")
@@ -190,7 +200,7 @@ def main():
         p2_file = st.file_uploader("Person 2 candidate result JSON", type="json", key="p2_upload")
 
     inputs = [mode, default_bundle.bundle_sha256, sha256(load_taxonomy().model_dump_json().encode()).hexdigest()]
-    for uploaded in (video_file, p1_file, p2_file, prototypes_file):
+    for uploaded in (video_file, p1_file, p2_file, prototypes_file, interaction_file):
         inputs.append(sha256(uploaded.getvalue()).hexdigest() if uploaded is not None else None)
     fingerprint = sha256(json.dumps(inputs).encode()).hexdigest()
     if st.session_state.get("input_fingerprint") != fingerprint:
@@ -214,25 +224,38 @@ def main():
             try:
                 bank = PrototypeBank.model_validate_json(prototypes_file.getvalue()) if prototypes_file is not None else None
                 bundle = research_override(bank, default_bundle.metadata.configuration) if bank is not None else default_bundle
+                if bank is not None and default_bundle.metadata.detector_mode == "interaction_actions":
+                    raise ValueError("Action bundles require positive and negative supervised assets; positive-only prototype overrides are unsupported.")
+                interactions = InteractionEvidence.model_validate_json(interaction_file.getvalue()) if interaction_file is not None else None
                 config = Person1Config.from_yaml(ROOT / "configs/default.yaml")
                 config = replace(config, video_id="video-" + sha256(video_file.getvalue()).hexdigest()[:16])
                 st.session_state.active_bundle = bundle
-                st.session_state.analysis_job = start_analysis(st.session_state.source_path, bundle, config)
+                st.session_state.analysis_job = start_analysis(st.session_state.source_path, bundle, config, interactions)
             except Exception as exc:
                 st.error(f"Video analysis could not start: {exc}")
         poll_analysis()
         if video_file is None:
             st.info("Upload a video to start.")
-    elif p1_file is not None and p2_file is not None:
+    elif p1_file is not None and p2_file is not None and "p1" not in st.session_state:
         try:
             p1, p2 = read_dashboard_results(p1_file.getvalue(), p2_file.getvalue())
-            st.session_state.active_bundle = legacy_result_bundle(p2)
+            if default_bundle.metadata.detector_mode == "interaction_actions":
+                from cmai.detection import detect_with_assessments
+                if video_file is not None and p1.video.video_id != "video-" + st.session_state.video_sha256[:16]:
+                    raise ValueError("Action inference requires P1 results carrying the uploaded recording identity. Run Video analysis to regenerate matching results.")
+                interactions = InteractionEvidence.model_validate_json(interaction_file.getvalue()) if interaction_file is not None else None
+                p2, assessments = detect_with_assessments(p1, default_bundle, interactions,
+                                      st.session_state.get("source_path"), st.session_state.get("video_sha256"))
+                st.session_state.action_assessments = assessments
+                st.session_state.active_bundle = default_bundle
+            else:
+                st.session_state.active_bundle = legacy_result_bundle(p2)
             if video_file is not None and p1.video.video_id != "video-" + sha256(video_file.getvalue()).hexdigest()[:16]:
                 st.warning("Legacy results do not carry the uploaded video checksum. Confirm that it is the matching recording before reviewing clips.")
             st.session_state.p1, st.session_state.p2 = p1, p2
         except Exception as exc:
             st.error(f"Results could not be loaded: {exc}")
-    else:
+    elif p1_file is None or p2_file is None:
         st.info("Upload matching P1 and P2 results. A video is optional in this advanced mode.")
 
     if "p1" not in st.session_state or "p2" not in st.session_state:
@@ -254,7 +277,8 @@ def main():
             verifier = GroqQwenValidator(api_key=api_key, model=model.strip())
             selected_p2 = p2.model_copy(deep=True)
             selected_p2.persons = [p for p in selected_p2.persons if p.person_id == selected_person]
-            events = validate_p2_result(p1, selected_p2, verifier=verifier)
+            events = validate_p2_result(p1, selected_p2, verifier=verifier,
+                                        action_assessments=st.session_state.get("action_assessments"))
             st.session_state.events = [e.model_dump(mode="json") for e in events]
             st.session_state.camera_result = attach_machine_reviews(st.session_state.camera_result, events,
                                                  {"provider": "Groq", "model": model.strip(), "evidence_packet_schema": "1.0"})

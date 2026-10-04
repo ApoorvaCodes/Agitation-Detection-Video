@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.1",
+  "taxonomy_version": "cmai-long-form-camera-v1",
+  "detector_id": "hitting-kicking-two-centroid-research",
+  "version": "1-unavailable",
+  "mode": "unavailable",
+  "detector_mode": "interaction_actions",
+  "declared_labels": [
+    "cmai_07_hitting",
+    "cmai_08_kicking"
+  ],
+  "configuration": {
+    "window_seconds": 1.0666666666666667,
+    "overlap": 0.75,
+    "max_gap_seconds": 0.35,
+    "min_frames": 3,
+    "min_valid_fraction": 0.8,
+    "min_shared_fraction": 0.5,
+    "similarity_threshold": 0.8,
+    "smoothing_alpha": 0.5,
+    "min_event_seconds": 0.2,
+    "pose_weight": 1.0,
+    "motion_weight": 1.0,
+    "video_weight": 0
+  },
+  "pose_representation": "time-bins",
+  "temporal_bins": 4,
+  "rules": [],
+  "action_asset": null,
+  "action_quality": {
+    "min_detection_confidence": 0.6,
+    "min_landmark_visibility": 0.7,
+    "min_absent_contact_fraction": 0.8
+  },
+  "video_encoder": null
+}

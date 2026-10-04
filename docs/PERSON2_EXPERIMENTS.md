@@ -192,3 +192,5 @@ work. Those tasks are outside this module.
 ## CMAI camera event workflow
 
 New training manifests require schema `2.0`, `taxonomy_version: cmai-long-form-camera-v1`, and `detector_mode: pose_motion_camera`. Canonical CMAI IDs and label-agreement provenance are required. Existing schema `1.0` result/prototype handoffs remain compatible. See [camera annotation and event evaluation](CMAI_ANNOTATION.md) for event-level preparation, uncertain coverage, per-item evidence gates and release criteria, and [camera workflow](CMAI_CAMERA.md) for asset packaging. No empirical dataset or release approval is bundled.
+
+See [hitting/kicking candidate setup, event annotations and experiments](CMAI_ACTIONS.md) for the optional supervised action path. Items 07/08 remain unavailable by default pending permitted labelled data and release evidence.

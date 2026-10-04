@@ -5,6 +5,9 @@ from pydantic import Field, model_validator
 from cmai.bundle import DetectorBundle
 from cmai.taxonomy import VERSION, load_taxonomy
 from person2.contracts import Contract, BehaviourScore
+from cmai.interactions import ContactObservation
+from cmai.action_detection import ActionEvidenceResult, LIMBS
+from cmai.taxonomy import ACTION_ITEMS
 
 ReviewStatus = Literal["pending", "confirmed", "rejected", "uncertain"]
 
@@ -24,6 +27,7 @@ class CandidateEvidence(Contract):
     clip_path: str | None = None
     clip_status: Literal["pending", "available", "unavailable"] = "pending"
     clip_start_timestamp: float | None = Field(default=None, ge=0)
+    contacts: list[ContactObservation] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def safe_references(self):
@@ -113,7 +117,7 @@ class TrackCoverage(Contract):
 
 
 class CameraResult(Contract):
-    contract_version: Literal["cmai-camera-result-1.0"] = "cmai-camera-result-1.0"
+    contract_version: Literal["cmai-camera-result-1.0", "cmai-camera-result-1.1"] = "cmai-camera-result-1.0"
     taxonomy_version: Literal["cmai-long-form-camera-v1"] = VERSION
     taxonomy_form: Literal["CMAI 29-item long form"] = "CMAI 29-item long form"
     taxonomy_edition: str
@@ -129,10 +133,18 @@ class CameraResult(Contract):
     coverage: list[TrackCoverage]
     events: list[CameraEvent]
     limitations: list[str]
+    action_assessments: ActionEvidenceResult | None = None
 
     @model_validator(mode="after")
     def consistent_result(self):
         taxonomy = load_taxonomy()
+        if self.detector.detector_mode == "interaction_actions":
+            if self.contract_version != "cmai-camera-result-1.1":
+                raise ValueError("action results require companion contract 1.1")
+            if self.action_assessments is None or self.action_assessments.video_id != self.video_id:
+                raise ValueError("action results require matching evidence assessments")
+            if self.action_assessments.recording_sha256 != self.source_sha256:
+                raise ValueError("action assessments must match source recording checksum")
         ids = [a.cmai_item_id for a in self.availability]
         if set(ids) != {i.item_id for i in taxonomy.items} or len(ids) != 29:
             raise ValueError("result must report availability for all 29 items")
@@ -151,6 +163,21 @@ class CameraResult(Contract):
             if len({c.chunk_id for c in track.intervals}) != len(track.intervals):
                 raise ValueError("duplicate chunk IDs in track coverage")
         for e in self.events:
+            if e.cmai_item_id in ACTION_ITEMS:
+                contacts = e.evidence.contacts
+                supported = {c.evidence_id:c for a in self.action_assessments.assessments
+                             if a.person_id == e.evidence.person_id and a.item_id == e.cmai_item_id
+                             and a.chunk_id in e.evidence.chunk_ids and a.status == "scored"
+                             for c in a.contacts} if self.action_assessments else {}
+                if any(c.limb not in LIMBS[e.cmai_item_id] or supported.get(c.evidence_id) != c for c in contacts):
+                    raise ValueError("action contact must match the limb and scored assessments")
+                if not contacts or any(c.person_id != e.evidence.person_id or c.contact != "observed"
+                                       or not c.target_visible or not c.actor_limb_visible
+                                       or c.frame_index not in e.evidence.frame_indices
+                                       or not e.start_timestamp <= c.timestamp < e.end_timestamp for c in contacts):
+                    raise ValueError("action candidate requires visible, source-linked observed contact")
+                if len({(c.target_kind,c.target_id) for c in contacts}) != 1:
+                    raise ValueError("action event cannot merge different targets")
             if e.cmai_item_id not in rules:
                 raise ValueError("event item has no enabled detector")
             if e.evidence.video_id != self.video_id or e.evidence.person_id not in people:

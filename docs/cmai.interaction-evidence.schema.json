@@ -1,0 +1,196 @@
+{
+  "$defs": {
+    "BoundingBox": {
+      "additionalProperties": false,
+      "properties": {
+        "x_min": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X Min",
+          "type": "number"
+        },
+        "y_min": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y Min",
+          "type": "number"
+        },
+        "x_max": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X Max",
+          "type": "number"
+        },
+        "y_max": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y Max",
+          "type": "number"
+        },
+        "coordinate_system": {
+          "default": "normalized",
+          "title": "Coordinate System",
+          "type": "string"
+        }
+      },
+      "required": [
+        "x_min",
+        "y_min",
+        "x_max",
+        "y_max"
+      ],
+      "title": "BoundingBox",
+      "type": "object"
+    },
+    "ContactObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "minLength": 1,
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "person_id": {
+          "minLength": 1,
+          "title": "Person Id",
+          "type": "string"
+        },
+        "frame_index": {
+          "minimum": 0,
+          "title": "Frame Index",
+          "type": "integer"
+        },
+        "timestamp": {
+          "minimum": 0,
+          "title": "Timestamp",
+          "type": "number"
+        },
+        "limb": {
+          "enum": [
+            "left_hand",
+            "right_hand",
+            "left_foot",
+            "right_foot"
+          ],
+          "title": "Limb",
+          "type": "string"
+        },
+        "target_kind": {
+          "enum": [
+            "person",
+            "self",
+            "object"
+          ],
+          "title": "Target Kind",
+          "type": "string"
+        },
+        "target_id": {
+          "minLength": 1,
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_bbox": {
+          "$ref": "#/$defs/BoundingBox"
+        },
+        "target_visible": {
+          "title": "Target Visible",
+          "type": "boolean"
+        },
+        "actor_limb_visible": {
+          "title": "Actor Limb Visible",
+          "type": "boolean"
+        },
+        "contact": {
+          "enum": [
+            "observed",
+            "absent",
+            "unclear"
+          ],
+          "title": "Contact",
+          "type": "string"
+        },
+        "evidence_reference": {
+          "minLength": 1,
+          "title": "Evidence Reference",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "person_id",
+        "frame_index",
+        "timestamp",
+        "limb",
+        "target_kind",
+        "target_id",
+        "target_bbox",
+        "target_visible",
+        "actor_limb_visible",
+        "contact",
+        "evidence_reference"
+      ],
+      "title": "ContactObservation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "cmai-interaction-evidence-1.0",
+      "default": "cmai-interaction-evidence-1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "video_id": {
+      "minLength": 1,
+      "title": "Video Id",
+      "type": "string"
+    },
+    "recording_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Recording Sha256",
+      "type": "string"
+    },
+    "provider_id": {
+      "minLength": 1,
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "provider_version": {
+      "minLength": 1,
+      "title": "Provider Version",
+      "type": "string"
+    },
+    "method": {
+      "enum": [
+        "manual_visual_review",
+        "external_contact_detector"
+      ],
+      "title": "Method",
+      "type": "string"
+    },
+    "annotation_protocol": {
+      "minLength": 1,
+      "title": "Annotation Protocol",
+      "type": "string"
+    },
+    "observations": {
+      "items": {
+        "$ref": "#/$defs/ContactObservation"
+      },
+      "title": "Observations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "video_id",
+    "recording_sha256",
+    "provider_id",
+    "provider_version",
+    "method",
+    "annotation_protocol",
+    "observations"
+  ],
+  "title": "InteractionEvidence",
+  "type": "object"
+}

@@ -167,3 +167,27 @@ def test_multiple_tracks_require_selection_before_remote_review(monkeypatch):
         app.selectbox(key="selected_person").select("another-track").run()
         assert not app.exception
         assert not next(b for b in app.button if b.label == "Verify candidates with Groq").disabled
+
+
+def test_unavailable_action_preset_preserves_video_upload(monkeypatch):
+    from cmai.bundle import load_bundle
+    from cmai.detection import detect_with_assessments
+    from test_cmai_actions import fixture
+    monkeypatch.setenv('CMAI_DETECTOR_BUNDLE',str(APP.parent/'configs/cmai_action_detector_bundle.json'))
+    p1,_,_=fixture()
+    bundle=load_bundle(APP.parent/'configs/cmai_action_detector_bundle.json')
+    p2,checks=detect_with_assessments(p1,bundle)
+    from hashlib import sha256
+    checks.recording_sha256=sha256(b'synthetic-upload-only').hexdigest()
+    job=CompleteJob(p1,p2)
+    job.action_assessments=lambda:checks
+    uploaded=BytesIO(b'synthetic-upload-only');uploaded.name='fixture.mp4'
+    with patch('streamlit.file_uploader',side_effect=lambda label,**kwargs:uploaded if label=='Upload video' else None), \
+         patch('cmai.jobs.start_analysis',return_value=job) as analyze:
+        app=make_app(monkeypatch).run()
+        assert not app.exception
+        app.button[0].click().run()
+        assert not app.exception and not app.error
+        assert analyze.call_args.args[1].metadata.detector_mode=='interaction_actions'
+        assert app.session_state.camera_result.contract_version=='cmai-camera-result-1.1'
+        assert not app.session_state.camera_result.events

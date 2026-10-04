@@ -83,3 +83,5 @@ criteria are pre-approved in this repository. Independent replication,
 representative conditions, uncertainty analysis and clinical review require
 additional real data and study design. The current protocol is an engineering
 starting point, not a validated clinical annotation standard.
+
+See [hitting/kicking candidate setup, event annotations and experiments](CMAI_ACTIONS.md) for the optional supervised action path. Items 07/08 remain unavailable by default pending permitted labelled data and release evidence.

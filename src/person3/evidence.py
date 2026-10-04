@@ -26,6 +26,7 @@ def build_evidence_packet(candidate: CandidateBehaviour, person) -> EvidencePack
                 if name in {"left_shoulder", "right_shoulder", "left_elbow", "right_elbow", "left_wrist", "right_wrist", "left_hip", "right_hip", "left_knee", "right_knee", "left_ankle", "right_ankle"}:
                     pose[name] = {"x": point.x, "y": point.y, "z": point.z}
         quality = o.quality.model_dump(mode="json", exclude_none=True)
+        quality["contact_evidence"] = [e for e in candidate.evidence.get("contacts", []) if e["frame_index"] == o.frame_index]
         rows.append(EvidenceSegment(evidence_id=oid, timestamp=o.timestamp, frame_index=o.frame_index,
                                     motion_features=relevant, pose=pose, quality_flags=quality))
     taxonomy_item = normalize_behaviour(candidate.behaviour)
@@ -36,7 +37,7 @@ def build_evidence_packet(candidate: CandidateBehaviour, person) -> EvidencePack
                           source_window_ids=candidate.source_window_ids, segments=rows)
 
 
-def candidates_from_p2(p2_result, p1_result) -> list[CandidateBehaviour]:
+def candidates_from_p2(p2_result, p1_result, action_assessments=None) -> list[CandidateBehaviour]:
     """Adapt the existing Person2VideoResult schema 1.0 without mutating it."""
     if p2_result.schema_version != "1.0" or p2_result.source_schema_version != p1_result.schema_version:
         raise ValueError("unsupported P1/P2 schema version")
@@ -61,5 +62,12 @@ def candidates_from_p2(p2_result, p1_result) -> list[CandidateBehaviour]:
                 source_observation_ids=[observation_id(p2_person.person_id, o.frame_index) for o in rows],
                 evidence={"p2_peak_similarity": event.peak_similarity},
             )
+            if action_assessments is not None:
+                contacts = {e.evidence_id:e.model_dump(mode="json") for a in action_assessments.assessments
+                            if a.person_id == p2_person.person_id and a.item_id == event.behaviour
+                            and a.chunk_id in event.chunk_ids and a.status == "scored"
+                            for e in a.contacts if e.contact == "observed" and event.start_timestamp <= e.timestamp < event.end_timestamp}
+                candidate.evidence["contacts"] = list(contacts.values())
+                candidate.evidence["score_semantics"] = "uncalibrated_cosine_similarity"
             output.append(candidate)
     return output

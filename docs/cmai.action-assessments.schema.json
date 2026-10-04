@@ -1,0 +1,282 @@
+{
+  "$defs": {
+    "ActionAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "person_id": {
+          "title": "Person Id",
+          "type": "string"
+        },
+        "chunk_id": {
+          "title": "Chunk Id",
+          "type": "string"
+        },
+        "item_id": {
+          "title": "Item Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "scored",
+            "low_quality",
+            "contact_unavailable",
+            "contact_unclear",
+            "incompatible_evidence"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "contact_present": {
+          "default": false,
+          "title": "Contact Present",
+          "type": "boolean"
+        },
+        "positive_similarity": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Positive Similarity"
+        },
+        "negative_similarity": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Negative Similarity"
+        },
+        "contrast_margin": {
+          "anyOf": [
+            {
+              "maximum": 2,
+              "minimum": -2,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contrast Margin"
+        },
+        "contacts": {
+          "items": {
+            "$ref": "#/$defs/ContactObservation"
+          },
+          "title": "Contacts",
+          "type": "array"
+        }
+      },
+      "required": [
+        "person_id",
+        "chunk_id",
+        "item_id",
+        "status",
+        "reason"
+      ],
+      "title": "ActionAssessment",
+      "type": "object"
+    },
+    "BoundingBox": {
+      "additionalProperties": false,
+      "properties": {
+        "x_min": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X Min",
+          "type": "number"
+        },
+        "y_min": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y Min",
+          "type": "number"
+        },
+        "x_max": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X Max",
+          "type": "number"
+        },
+        "y_max": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y Max",
+          "type": "number"
+        },
+        "coordinate_system": {
+          "default": "normalized",
+          "title": "Coordinate System",
+          "type": "string"
+        }
+      },
+      "required": [
+        "x_min",
+        "y_min",
+        "x_max",
+        "y_max"
+      ],
+      "title": "BoundingBox",
+      "type": "object"
+    },
+    "ContactObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "minLength": 1,
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "person_id": {
+          "minLength": 1,
+          "title": "Person Id",
+          "type": "string"
+        },
+        "frame_index": {
+          "minimum": 0,
+          "title": "Frame Index",
+          "type": "integer"
+        },
+        "timestamp": {
+          "minimum": 0,
+          "title": "Timestamp",
+          "type": "number"
+        },
+        "limb": {
+          "enum": [
+            "left_hand",
+            "right_hand",
+            "left_foot",
+            "right_foot"
+          ],
+          "title": "Limb",
+          "type": "string"
+        },
+        "target_kind": {
+          "enum": [
+            "person",
+            "self",
+            "object"
+          ],
+          "title": "Target Kind",
+          "type": "string"
+        },
+        "target_id": {
+          "minLength": 1,
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_bbox": {
+          "$ref": "#/$defs/BoundingBox"
+        },
+        "target_visible": {
+          "title": "Target Visible",
+          "type": "boolean"
+        },
+        "actor_limb_visible": {
+          "title": "Actor Limb Visible",
+          "type": "boolean"
+        },
+        "contact": {
+          "enum": [
+            "observed",
+            "absent",
+            "unclear"
+          ],
+          "title": "Contact",
+          "type": "string"
+        },
+        "evidence_reference": {
+          "minLength": 1,
+          "title": "Evidence Reference",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "person_id",
+        "frame_index",
+        "timestamp",
+        "limb",
+        "target_kind",
+        "target_id",
+        "target_bbox",
+        "target_visible",
+        "actor_limb_visible",
+        "contact",
+        "evidence_reference"
+      ],
+      "title": "ContactObservation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "cmai-action-assessments-1.0",
+      "default": "cmai-action-assessments-1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "video_id": {
+      "title": "Video Id",
+      "type": "string"
+    },
+    "recording_sha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Recording Sha256"
+    },
+    "provider_identity": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Identity"
+    },
+    "assessments": {
+      "items": {
+        "$ref": "#/$defs/ActionAssessment"
+      },
+      "title": "Assessments",
+      "type": "array"
+    }
+  },
+  "required": [
+    "video_id",
+    "assessments"
+  ],
+  "title": "ActionEvidenceResult",
+  "type": "object"
+}

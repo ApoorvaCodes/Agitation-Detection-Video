@@ -22,6 +22,11 @@ class Person2Config:
             raise ValueError("min_frames must be an integer")
         if not all(math.isfinite(v) for v in asdict(self).values()):
             raise ValueError("configuration must be finite")
+        # JSON/Pydantic reconstruct float fields as floats. Canonicalize here
+        # so 1 and 1.0 never identify different embedding/model spaces.
+        for name in asdict(self):
+            if name != "min_frames":
+                object.__setattr__(self, name, float(getattr(self, name)))
         if self.window_seconds <= 0 or self.max_gap_seconds <= 0 or self.min_frames < 1:
             raise ValueError("durations and min_frames must be positive")
         if not 0 <= self.overlap < 1:

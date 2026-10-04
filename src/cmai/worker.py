@@ -6,7 +6,9 @@ import sys
 import time
 
 from cmai.bundle import DetectorBundle, LoadedBundle
-from cmai.detection import detect
+from cmai.detection import detect_with_assessments
+from cmai.action_model import ActionModel
+from cmai.interactions import InteractionEvidence
 from person1.config import Person1Config
 from person1.ingestion import VideoLoader
 from person1.pipeline import process_video
@@ -50,8 +52,14 @@ def run(request_path):
             progress("running", "Embedding and aggregating each person track independently…", .9)
         metadata = DetectorBundle.model_validate(request["bundle"])
         bank = PrototypeBank.model_validate(request["bank"]) if request["bank"] else None
-        bundle = LoadedBundle(metadata, bank, sha256(metadata.model_dump_json().encode()).hexdigest())
-        p2 = detect(p1, bundle)
+        model = ActionModel.model_validate(request["action_model"]) if request.get("action_model") else None
+        checkpoint = Path(request["checkpoint_path"]) if request.get("checkpoint_path") else None
+        interactions = InteractionEvidence.model_validate(request["interactions"]) if request.get("interactions") else None
+        bundle = LoadedBundle(metadata, bank, request.get("bundle_sha256") or sha256(metadata.model_dump_json().encode()).hexdigest(), model, checkpoint)
+        recording_hash = sha256(Path(request["path"]).read_bytes()).hexdigest()
+        p2, assessments = detect_with_assessments(p1, bundle, interactions, request["path"], recording_hash)
+        if assessments is not None:
+            (directory / "action-assessments.json").write_text(assessments.model_dump_json())
         (directory / "perception.json").write_text(p1.model_dump_json())
         (directory / "candidates.json").write_text(p2.model_dump_json())
         progress("complete", "Video analysis completed.", 1)

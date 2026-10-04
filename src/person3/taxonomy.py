@@ -48,6 +48,7 @@ def normalize_behaviour(value: str) -> Behaviour | None:
     """Resolve only explicit taxonomy labels/aliases; no fuzzy classification."""
     key = value.strip().casefold().replace("-", "_")
     if key.startswith("cmai_"):
+        key = {"cmai_07_hitting":"hitting", "cmai_08_kicking":"kicking"}.get(key, key)
         from cmai.taxonomy import LEGACY_LABELS
         key = next((alias for alias, item_id in LEGACY_LABELS.items() if item_id == key), key)
     return _LOOKUP.get(key) or _LOOKUP.get(key.replace("_", " "))

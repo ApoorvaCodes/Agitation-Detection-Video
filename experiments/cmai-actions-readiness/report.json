@@ -1,0 +1,154 @@
+{
+  "schema_version": "cmai-action-experiment-1.0",
+  "taxonomy_version": "cmai-long-form-camera-v1",
+  "status": "pending_labelled_data",
+  "runtime": {
+    "python": "3.11.15",
+    "platform": "macOS-26.3-arm64-arm-64bit",
+    "dependencies": {
+      "numpy": "1.26.4",
+      "pydantic": "2.13.5",
+      "opencv-python": "4.11.0.86",
+      "pydantic-core": "2.46.5",
+      "annotated-types": "0.8.0",
+      "typing-extensions": "4.16.0",
+      "typing-inspection": "0.4.4"
+    },
+    "code_sha256": {
+      "cmai/__init__.py": "5ffa38e21722033b431ab2fbcaed6f04c57e461ad4221cfb79a3b876eb0d1918",
+      "cmai/action_detection.py": "7c6ed21dd522a1d488fde114436a32e7bc8a14417081e05f959dc7a1425144f3",
+      "cmai/action_experiments.py": "ecf3a34b616c8a76f90fe257c1429f884aa6bfcdb59ed9e0e8dd2bf926bdc4bd",
+      "cmai/action_model.py": "ba05c8eaa461c90e0684dcd636e58c9deb6383b5e3b61157983daaee5ede670b",
+      "cmai/bundle.py": "68dd088f99842c9924448610d51dd52a26cc5d214b96dc298a8a2bfbc8e3c721",
+      "cmai/contracts.py": "7c1cde5114be990e53700c0abcd40a20b5184320b9ac2ba1e22c4fcee32fb59b",
+      "cmai/detection.py": "98fd9cd58493b3fa0fd793268458016132493ac3d33b7800e4e9fbe7a69fce70",
+      "cmai/experiments.py": "b3e089f3a86ce75427c86880f9cb83522a4d58aa760e5c66e17f12c3e90bf7fe",
+      "cmai/interactions.py": "7e7e97a0ce1ee55286c9f95b25d4611da23db6290b6fa1751cb5503ad5ad9031",
+      "cmai/jobs.py": "e0428efddf4224d4c3ee81b0b5fb9fcaa8f5ec8b4a3ffa32beed7491fd30d504",
+      "cmai/results.py": "451d8c38c2be4c8b42fc7b3e08b68cfeba7832133366d8e8ba4609e22037935c",
+      "cmai/taxonomy.py": "e41906d006567bfc5f9d5c75876a7c51eec9c95680871fe7bb59e3c29d666135",
+      "cmai/video_actions.py": "e797b1acc2d38fbbc908302f3d4ab52d3412e6cc0d6b02f99c3bfaa465ab1e74",
+      "cmai/worker.py": "e797d72a1ee20eb68462b530c811bc1376365be223a64681f8b3ff36b5b971b8",
+      "person1/__init__.py": "9b677564b05aba5492f2ead217eb88689c2e3a157fad2c10e4562cc72f1d22b0",
+      "person1/cli.py": "28a79554e4b288fb5f76d9d5535a24607a5171bcf60d00ca20c4b8ae355190ae",
+      "person1/config.py": "e0df39ae283e28d34fae87774178774e9927760fed37026e24b9edba14700258",
+      "person1/contracts.py": "4af40e24d36631fe5b115936f6b4acb1ab6aafbbfe88f2df69eac3a1a3a1308c",
+      "person1/errors.py": "3b3a8e1d779e160ab3a98714b5da4d325ca07713e4db0f02b41a8095b0d1b6b7",
+      "person1/features.py": "2c2ef0b4bd8699aa57332b23b694a219aa4ba30b52d6a37676afb83a845e07f9",
+      "person1/ingestion.py": "6568fb11b4de6d1e0c327a7a48c57cec9f3091c06abc4f6ea1d2123763f37fdd",
+      "person1/io.py": "7e1f7d6ebdbe46d2081b19910883a056a6e71951ff58f0a379fd5defaf557982",
+      "person1/overlay.py": "c236f04cb0ede1f6a88e4bafe72875321a0e88e7e52485f860e041fb9c90c3fd",
+      "person1/perception.py": "fb3a90a219bf6dad9816a5158477db77b8ed8423cae36a11430e91018e0beb61",
+      "person1/pipeline.py": "ad47a880045ecf85f6b3aa7e7039c7106ebdaaa6343f75a90d70be0c73728d7f",
+      "person1/tracking.py": "1cb00989a33eab803c4758db0143b09a8110adb595c34d8f6b873fad5074c2e0",
+      "person2/__init__.py": "ee9feb22842a39c2fbbfe88f3d822036a623a992f12daf735e4767743b5761bb",
+      "person2/chunking.py": "d9ab6cfa1500be4325c2777039b5ee21c006241920a75bfb670c5493c281e2ba",
+      "person2/cli.py": "6966201e7ce0b200d7892d7e3f87ab81b5c541e6e63e7c965cfa862581b02780",
+      "person2/config.py": "b60fd733071ac1bb6559fd0e89d45fd5eb406e0f78c0630a9f0b2ced53547a0c",
+      "person2/contracts.py": "7cfd8cb1d4fe229a37b405cde529ec5e4b320033d68df630e930430b1488c2ee",
+      "person2/embeddings.py": "3884dcd4fe0f4cfee3be14f0fc18b0b27f1dc40ce5e22de7355a1bc3e3b2cdd1",
+      "person2/experiments.py": "00a4b812ff6e27560a186001669cf9e630c6117b43333ef1c9cb279325d7c5b5",
+      "person2/io.py": "5cff2c57d82769252eaf5666f77dc4e5df0f79ee0573e5887b14a8fd7c35be1d",
+      "person2/pipeline.py": "332417aa02adf1e10c9db084f279aade3a24726494379213f67f8606a9320681",
+      "person2/prototypes.py": "14b4d987e4bfd8a195682498283774d8a3d6487997c2692404ea71b05b1a03ed"
+    }
+  },
+  "threshold_grid": [
+    0.6,
+    0.8,
+    0.9
+  ],
+  "contrast_margin_grid": [
+    0,
+    0.1,
+    0.2
+  ],
+  "variants": {
+    "pose_only": {
+      "status": "pending_labelled_data",
+      "configuration": {
+        "window_seconds": 1.0666666666666667,
+        "overlap": 0.75,
+        "max_gap_seconds": 0.35,
+        "min_frames": 3,
+        "min_valid_fraction": 0.8,
+        "min_shared_fraction": 0.5,
+        "similarity_threshold": 0.8,
+        "smoothing_alpha": 0.5,
+        "min_event_seconds": 0.2,
+        "pose_weight": 1.0,
+        "motion_weight": 0.0,
+        "video_weight": 0.0
+      },
+      "metrics": null
+    },
+    "motion_only": {
+      "status": "pending_labelled_data",
+      "configuration": {
+        "window_seconds": 1.0666666666666667,
+        "overlap": 0.75,
+        "max_gap_seconds": 0.35,
+        "min_frames": 3,
+        "min_valid_fraction": 0.8,
+        "min_shared_fraction": 0.5,
+        "similarity_threshold": 0.8,
+        "smoothing_alpha": 0.5,
+        "min_event_seconds": 0.2,
+        "pose_weight": 0.0,
+        "motion_weight": 1.0,
+        "video_weight": 0.0
+      },
+      "metrics": null
+    },
+    "pose_plus_motion": {
+      "status": "pending_labelled_data",
+      "configuration": {
+        "window_seconds": 1.0666666666666667,
+        "overlap": 0.75,
+        "max_gap_seconds": 0.35,
+        "min_frames": 3,
+        "min_valid_fraction": 0.8,
+        "min_shared_fraction": 0.5,
+        "similarity_threshold": 0.8,
+        "smoothing_alpha": 0.5,
+        "min_event_seconds": 0.2,
+        "pose_weight": 1.0,
+        "motion_weight": 1.0,
+        "video_weight": 0.0
+      },
+      "metrics": null
+    },
+    "temporal_pose_motion": {
+      "status": "pending_labelled_data",
+      "configuration": {
+        "window_seconds": 1.0666666666666667,
+        "overlap": 0.75,
+        "max_gap_seconds": 0.35,
+        "min_frames": 3,
+        "min_valid_fraction": 0.8,
+        "min_shared_fraction": 0.5,
+        "similarity_threshold": 0.8,
+        "smoothing_alpha": 0.5,
+        "min_event_seconds": 0.2,
+        "pose_weight": 1.0,
+        "motion_weight": 1.0,
+        "video_weight": 0.0
+      },
+      "metrics": null
+    }
+  },
+  "selection": null,
+  "limitations": [
+    "No clinical validity, calibration, intent, injury or two-week frequency inference.",
+    "Contact evidence is independently reviewed/external; P1 does not detect contact or objects.",
+    "Two-centroid classifier is an engineering baseline, not an evaluated best representation.",
+    "Coverage counts overlapping annotated windows; no independent-window confidence interval is inferred.",
+    "Participant identities, permissions and contact provenance require dataset-owner audit.",
+    "Test is evaluated once per representation per command; freeze reports and avoid repeated test-guided development."
+  ],
+  "video_comparison": {
+    "status": "pending_local_checkpoint",
+    "model": "torchvision_r3d_18_kinetics400_v1",
+    "metrics": null
+  }
+}

@@ -62,3 +62,5 @@ Analysis includes progress and cancellation. **Existing results (advanced)**
 retains compatible P1/P2 JSON review. See [camera setup and contract](docs/CMAI_CAMERA.md),
 [annotation/evaluation protocol](docs/CMAI_ANNOTATION.md), [Person 3 setup](docs/PERSON3.md),
 and [Person 2 experiments](docs/PERSON2_EXPERIMENTS.md).
+
+See [hitting/kicking candidate setup, event annotations and experiments](docs/CMAI_ACTIONS.md) for the optional supervised action path. Items 07/08 remain unavailable by default pending permitted labelled data and release evidence.

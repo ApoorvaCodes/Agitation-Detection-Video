@@ -1,5 +1,5 @@
 """Behaviour-specific prototype rules on the existing Person 2 baseline."""
-from dataclasses import replace
+from dataclasses import asdict, replace
 
 from person2.pipeline import aggregate_events, process_perception
 from person2.embeddings import usable_pose
@@ -75,9 +75,40 @@ def apply_rules(result, rules, source=None):
     return result
 
 
-def detect(source, bundle):
+def detect_with_assessments(source, bundle, interactions=None, video_path=None, recording_sha256=None, extracted_result=None):
     if bundle.metadata.mode == "legacy_review":
         raise ValueError("legacy review cannot run a detector without original model assets")
-    result = process_perception(source, bundle.metadata.configuration, bundle.bank,
-                                pose_encoder=bundle.pose_encoder())
-    return apply_rules(result, bundle.metadata.rules, source)
+    video_encoder = None
+    if interactions is not None:
+        interactions.validate_source(source, recording_sha256)
+    if extracted_result is not None:
+        if extracted_result.video_id != source.video.video_id:
+            raise ValueError("cached embeddings belong to another recording")
+        cached_cfg = asdict(extracted_result.configuration)
+        active_cfg = asdict(bundle.metadata.configuration)
+        cached_cfg.pop("similarity_threshold")
+        active_cfg.pop("similarity_threshold")
+        if cached_cfg != active_cfg:
+            raise ValueError("cached embeddings use incompatible extraction configuration")
+        result = extracted_result.model_copy(deep=True)
+        result.configuration = bundle.metadata.configuration
+        for person in result.persons:
+            for chunk in person.chunks:
+                if chunk.status == "no_prototypes" and bundle.action_model:
+                    chunk.status = "scored"
+    elif bundle.metadata.video_encoder is not None:
+        if video_path is None:
+            raise ValueError("this action bundle requires the original source video")
+        from cmai.video_actions import LocalR3DEncoder
+        video_encoder = LocalR3DEncoder(video_path, bundle.checkpoint_path, bundle.metadata.video_encoder, interactions, source)
+    if extracted_result is None:
+        result = process_perception(source, bundle.metadata.configuration, bundle.bank,
+                                pose_encoder=bundle.pose_encoder(), video_encoder=video_encoder)
+    if bundle.metadata.detector_mode == "interaction_actions":
+        from cmai.action_detection import apply_action_rules
+        return apply_action_rules(result, source, bundle, interactions, recording_sha256)
+    return apply_rules(result, bundle.metadata.rules, source), None
+
+
+def detect(source, bundle, **kwargs):
+    return detect_with_assessments(source, bundle, **kwargs)[0]

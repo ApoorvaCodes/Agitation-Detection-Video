@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Literal
 from pydantic import Field, model_validator
 
-from cmai.taxonomy import VERSION, ROOT, require_initial_items, canonical_item
+from cmai.taxonomy import VERSION, ROOT, require_initial_items, require_action_items, canonical_item
 from person2.config import Person2Config
 from person2.contracts import Contract, PrototypeBank
 from person2.embeddings import TemporalPoseEncoder
@@ -21,6 +21,28 @@ class DetectorRule(Contract):
     min_consecutive_chunks: int = Field(default=2, ge=2)
     min_event_seconds: float = Field(default=2, gt=0)
     min_evidence_fraction: float = Field(default=.6, gt=0, le=1)
+    contrast_margin: float = Field(default=0, ge=0, le=2)
+
+
+class ActionQuality(Contract):
+    min_detection_confidence: float = Field(default=.6, ge=0, le=1)
+    min_landmark_visibility: float = Field(default=.7, ge=0, le=1)
+    min_absent_contact_fraction: float = Field(default=.8, gt=0, le=1)
+
+
+class LocalVideoEncoder(Contract):
+    model: Literal["torchvision_r3d_18_kinetics400_v1"]
+    checkpoint_file: str = Field(min_length=1)
+    checkpoint_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source: Literal["https://download.pytorch.org/models/r3d_18-b3b3357e.pth"]
+    clip_frames: Literal[16] = 16
+    sample_fps: Literal[15] = 15
+
+
+class ActionAsset(Contract):
+    model: Literal["masked_two_centroid_classifier_v1"] = "masked_two_centroid_classifier_v1"
+    file: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 EVIDENCE_REQUIREMENTS = {
@@ -53,10 +75,12 @@ class AcceptanceCriteria(Contract):
     min_event_f1: float = Field(ge=0, le=1)
     min_coverage: float = Field(ge=0, le=1)
     min_test_positive_events: int = Field(ge=1)
+    min_test_negative_intervals: int = Field(default=1, ge=1)
+    max_mean_absolute_timing_error_seconds: float | None = Field(default=None, ge=0)
 
 
 class DetectorBundle(Contract):
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.0", "1.1"] = "1.0"
     taxonomy_version: Literal["cmai-long-form-camera-v1"] = VERSION
     detector_id: str = Field(min_length=1)
     version: str = Field(min_length=1)
@@ -68,17 +92,38 @@ class DetectorBundle(Contract):
     prototype_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     rules: list[DetectorRule] = Field(default_factory=list)
     release_evidence: ReleaseEvidence | None = None
+    detector_mode: Literal["pose_motion_camera", "interaction_actions"] = "pose_motion_camera"
+    declared_labels: list[str] = Field(default_factory=list)
+    action_asset: ActionAsset | None = None
+    action_quality: ActionQuality = Field(default_factory=ActionQuality)
+    video_encoder: LocalVideoEncoder | None = None
 
     @model_validator(mode="after")
     def check_gate(self):
         labels = [r.item_id for r in self.rules]
-        require_initial_items(labels)
+        validate_labels = require_action_items if self.detector_mode == "interaction_actions" else require_initial_items
+        validate_labels(labels)
+        validate_labels(self.declared_labels)
+        if self.detector_mode == "interaction_actions":
+            if self.schema_version != "1.1":
+                raise ValueError("interaction action bundles require schema 1.1")
+            if len(set(self.declared_labels)) != len(self.declared_labels) or not set(labels) <= set(self.declared_labels):
+                raise ValueError("action rules must use unique declared canonical labels")
+            if self.prototype_file or self.prototype_sha256:
+                raise ValueError("interaction bundles require positive and negative action assets, not positive-only prototypes")
+            if self.mode != "unavailable" and (not self.action_asset or not labels):
+                raise ValueError("enabled interaction bundle needs supervised action asset and rules")
+        elif self.action_asset or self.video_encoder:
+            raise ValueError("action/video assets require interaction_actions mode")
+        if self.video_encoder and (self.configuration.video_weight <= 0
+                or abs(self.configuration.window_seconds-16/15) > 1e-6):
+            raise ValueError("R3D-18 requires an enabled video modality and 16/15-second windows")
         if len(labels) != len(set(labels)):
             raise ValueError("detector rules must have unique item IDs")
         if self.mode == "unavailable":
-            if self.rules or self.prototype_file or self.prototype_sha256:
+            if self.rules or self.prototype_file or self.prototype_sha256 or self.action_asset:
                 raise ValueError("unavailable bundle cannot enable detectors")
-        elif self.mode != "legacy_review" and (not self.rules or not self.prototype_file or not self.prototype_sha256):
+        elif self.detector_mode == "pose_motion_camera" and self.mode != "legacy_review" and (not self.rules or not self.prototype_file or not self.prototype_sha256):
             raise ValueError("enabled bundle needs hashed prototypes and detector rules")
         if self.mode == "released" and self.release_evidence is None:
             raise ValueError("released detectors require evaluation, acceptance and approval evidence")
@@ -90,6 +135,8 @@ class LoadedBundle:
     metadata: DetectorBundle
     bank: PrototypeBank | None
     bundle_sha256: str
+    action_model: object | None = None
+    checkpoint_path: Path | None = None
 
     def pose_encoder(self):
         b = self.metadata
@@ -113,6 +160,23 @@ def load_bundle(path=None):
     if b.mode == "legacy_review":
         raise ValueError("legacy_review is an import status, not a runnable detector bundle")
     bank = None
+    action_model = None
+    checkpoint_path = None
+    if b.action_asset:
+        from cmai.action_model import ActionModel
+        raw = (path.parent / b.action_asset.file).read_bytes()
+        if sha256(raw).hexdigest() != b.action_asset.sha256:
+            raise ValueError("action model asset checksum mismatch")
+        action_model = ActionModel.model_validate_json(raw)
+        if {c.item_id for c in action_model.classes} != {r.item_id for r in b.rules}:
+            raise ValueError("action model classes must match bundle rules")
+        bank = action_model.positive_bank()
+    if b.video_encoder:
+        checkpoint_path = (path.parent / b.video_encoder.checkpoint_file).resolve()
+        if not checkpoint_path.is_file():
+            raise ValueError("R3D-18 checkpoint missing; provide an explicit local checkpoint, no download is automatic")
+        if sha256(checkpoint_path.read_bytes()).hexdigest() != b.video_encoder.checkpoint_sha256:
+            raise ValueError("video checkpoint checksum mismatch")
     if b.prototype_file:
         asset = (path.parent / b.prototype_file).resolve()
         raw = asset.read_bytes()
@@ -133,7 +197,8 @@ def load_bundle(path=None):
         if not report.get("split_audit") or not report.get("dataset_provenance"):
             raise ValueError("release report requires provenance and disjoint split audit")
         matches = [v for v in report.get("variants", {}).values()
-                   if v.get("prototype_sha256") == b.prototype_sha256 and v.get("configuration") == b.configuration.__dict__]
+                   if (v.get("action_model_sha256") == b.action_asset.sha256 if b.action_asset else v.get("prototype_sha256") == b.prototype_sha256)
+                   and v.get("configuration") == b.configuration.__dict__]
         if not matches or not matches[0].get("metrics", {}).get("test"):
             raise ValueError("release report does not evaluate this prototype/configuration")
         evaluated = matches[0]
@@ -147,7 +212,7 @@ def load_bundle(path=None):
                 raise ValueError("detector implementation differs from evaluated code")
         if not report.get("runtime", {}).get("code_sha256"):
             raise ValueError("release report lacks implementation hashes")
-        if evaluated.get("detector_rules") != [r.model_dump() for r in b.rules]:
+        if [DetectorRule.model_validate(r).model_dump() for r in evaluated.get("detector_rules", [])] != [r.model_dump() for r in b.rules]:
             raise ValueError("release report does not evaluate these detector rules")
         criteria_raw = (path.parent / evidence.acceptance_criteria).read_bytes()
         if sha256(criteria_raw).hexdigest() != evidence.acceptance_criteria_sha256:
@@ -159,13 +224,24 @@ def load_bundle(path=None):
         for c in criteria:
             chunk = test.get("per_label", {}).get(c.item_id, {})
             event = test.get("events", {}).get("per_item", {}).get(c.item_id, {})
+            if b.detector_mode == "interaction_actions":
+                chunk = event
             checks = [(chunk.get("precision"), c.min_precision), (chunk.get("recall"), c.min_recall),
                       (chunk.get("coverage"), c.min_coverage), (event.get("f1"), c.min_event_f1)]
             if any(actual is None or actual < minimum for actual, minimum in checks):
                 raise ValueError(f"held-out metrics do not meet acceptance criteria: {c.item_id}")
+            if b.detector_mode == "interaction_actions":
+                if event.get("negative_intervals", 0) < c.min_test_negative_intervals:
+                    raise ValueError("insufficient held-out negative intervals for action release")
+                timing = event.get("mean_absolute_timing_error_seconds")
+                if c.max_mean_absolute_timing_error_seconds is None or timing is None or timing > c.max_mean_absolute_timing_error_seconds:
+                    raise ValueError("action release requires reviewer-specified held-out timing acceptance")
             if event.get("tp", 0) + event.get("fn", 0) < c.min_test_positive_events:
                 raise ValueError("insufficient held-out positive events for release")
-    return LoadedBundle(b, bank, sha256(data).hexdigest())
+        if b.detector_mode == "interaction_actions":
+            if evaluated.get("action_quality") != b.action_quality.model_dump() or evaluated.get("video_encoder") != (b.video_encoder.model_dump() if b.video_encoder else None):
+                raise ValueError("release report evaluates different interaction quality/video settings")
+    return LoadedBundle(b, bank, sha256(data).hexdigest(), action_model, checkpoint_path)
 
 
 def research_override(bank, config):

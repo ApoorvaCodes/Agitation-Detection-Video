@@ -1,5 +1,208 @@
 {
   "$defs": {
+    "ActionAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "person_id": {
+          "title": "Person Id",
+          "type": "string"
+        },
+        "chunk_id": {
+          "title": "Chunk Id",
+          "type": "string"
+        },
+        "item_id": {
+          "title": "Item Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "scored",
+            "low_quality",
+            "contact_unavailable",
+            "contact_unclear",
+            "incompatible_evidence"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "contact_present": {
+          "default": false,
+          "title": "Contact Present",
+          "type": "boolean"
+        },
+        "positive_similarity": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Positive Similarity"
+        },
+        "negative_similarity": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Negative Similarity"
+        },
+        "contrast_margin": {
+          "anyOf": [
+            {
+              "maximum": 2,
+              "minimum": -2,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contrast Margin"
+        },
+        "contacts": {
+          "items": {
+            "$ref": "#/$defs/ContactObservation"
+          },
+          "title": "Contacts",
+          "type": "array"
+        }
+      },
+      "required": [
+        "person_id",
+        "chunk_id",
+        "item_id",
+        "status",
+        "reason"
+      ],
+      "title": "ActionAssessment",
+      "type": "object"
+    },
+    "ActionAsset": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "const": "masked_two_centroid_classifier_v1",
+          "default": "masked_two_centroid_classifier_v1",
+          "title": "Model",
+          "type": "string"
+        },
+        "file": {
+          "minLength": 1,
+          "title": "File",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "sha256"
+      ],
+      "title": "ActionAsset",
+      "type": "object"
+    },
+    "ActionEvidenceResult": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "cmai-action-assessments-1.0",
+          "default": "cmai-action-assessments-1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "video_id": {
+          "title": "Video Id",
+          "type": "string"
+        },
+        "recording_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recording Sha256"
+        },
+        "provider_identity": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Identity"
+        },
+        "assessments": {
+          "items": {
+            "$ref": "#/$defs/ActionAssessment"
+          },
+          "title": "Assessments",
+          "type": "array"
+        }
+      },
+      "required": [
+        "video_id",
+        "assessments"
+      ],
+      "title": "ActionEvidenceResult",
+      "type": "object"
+    },
+    "ActionQuality": {
+      "additionalProperties": false,
+      "properties": {
+        "min_detection_confidence": {
+          "default": 0.6,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Detection Confidence",
+          "type": "number"
+        },
+        "min_landmark_visibility": {
+          "default": 0.7,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Landmark Visibility",
+          "type": "number"
+        },
+        "min_absent_contact_fraction": {
+          "default": 0.8,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Min Absent Contact Fraction",
+          "type": "number"
+        }
+      },
+      "title": "ActionQuality",
+      "type": "object"
+    },
     "BehaviourScore": {
       "additionalProperties": false,
       "properties": {
@@ -52,6 +255,48 @@
         "shared_fraction"
       ],
       "title": "BehaviourScore",
+      "type": "object"
+    },
+    "BoundingBox": {
+      "additionalProperties": false,
+      "properties": {
+        "x_min": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X Min",
+          "type": "number"
+        },
+        "y_min": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y Min",
+          "type": "number"
+        },
+        "x_max": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X Max",
+          "type": "number"
+        },
+        "y_max": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y Max",
+          "type": "number"
+        },
+        "coordinate_system": {
+          "default": "normalized",
+          "title": "Coordinate System",
+          "type": "string"
+        }
+      },
+      "required": [
+        "x_min",
+        "y_min",
+        "x_max",
+        "y_max"
+      ],
+      "title": "BoundingBox",
       "type": "object"
     },
     "CameraEvent": {
@@ -229,6 +474,13 @@
           ],
           "default": null,
           "title": "Clip Start Timestamp"
+        },
+        "contacts": {
+          "items": {
+            "$ref": "#/$defs/ContactObservation"
+          },
+          "title": "Contacts",
+          "type": "array"
         }
       },
       "required": [
@@ -289,6 +541,96 @@
         "min_valid_fraction"
       ],
       "title": "CandidateQuality",
+      "type": "object"
+    },
+    "ContactObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "minLength": 1,
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "person_id": {
+          "minLength": 1,
+          "title": "Person Id",
+          "type": "string"
+        },
+        "frame_index": {
+          "minimum": 0,
+          "title": "Frame Index",
+          "type": "integer"
+        },
+        "timestamp": {
+          "minimum": 0,
+          "title": "Timestamp",
+          "type": "number"
+        },
+        "limb": {
+          "enum": [
+            "left_hand",
+            "right_hand",
+            "left_foot",
+            "right_foot"
+          ],
+          "title": "Limb",
+          "type": "string"
+        },
+        "target_kind": {
+          "enum": [
+            "person",
+            "self",
+            "object"
+          ],
+          "title": "Target Kind",
+          "type": "string"
+        },
+        "target_id": {
+          "minLength": 1,
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_bbox": {
+          "$ref": "#/$defs/BoundingBox"
+        },
+        "target_visible": {
+          "title": "Target Visible",
+          "type": "boolean"
+        },
+        "actor_limb_visible": {
+          "title": "Actor Limb Visible",
+          "type": "boolean"
+        },
+        "contact": {
+          "enum": [
+            "observed",
+            "absent",
+            "unclear"
+          ],
+          "title": "Contact",
+          "type": "string"
+        },
+        "evidence_reference": {
+          "minLength": 1,
+          "title": "Evidence Reference",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "person_id",
+        "frame_index",
+        "timestamp",
+        "limb",
+        "target_kind",
+        "target_id",
+        "target_bbox",
+        "target_visible",
+        "actor_limb_visible",
+        "contact",
+        "evidence_reference"
+      ],
+      "title": "ContactObservation",
       "type": "object"
     },
     "CoverageInterval": {
@@ -353,8 +695,11 @@
       "additionalProperties": false,
       "properties": {
         "schema_version": {
-          "const": "1.0",
           "default": "1.0",
+          "enum": [
+            "1.0",
+            "1.1"
+          ],
           "title": "Schema Version",
           "type": "string"
         },
@@ -444,6 +789,47 @@
             }
           ],
           "default": null
+        },
+        "detector_mode": {
+          "default": "pose_motion_camera",
+          "enum": [
+            "pose_motion_camera",
+            "interaction_actions"
+          ],
+          "title": "Detector Mode",
+          "type": "string"
+        },
+        "declared_labels": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Declared Labels",
+          "type": "array"
+        },
+        "action_asset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ActionAsset"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "action_quality": {
+          "$ref": "#/$defs/ActionQuality"
+        },
+        "video_encoder": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalVideoEncoder"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -486,6 +872,13 @@
           "maximum": 1,
           "title": "Min Evidence Fraction",
           "type": "number"
+        },
+        "contrast_margin": {
+          "default": 0,
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Contrast Margin",
+          "type": "number"
         }
       },
       "required": [
@@ -524,6 +917,51 @@
         "reason"
       ],
       "title": "ItemAvailability",
+      "type": "object"
+    },
+    "LocalVideoEncoder": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "const": "torchvision_r3d_18_kinetics400_v1",
+          "title": "Model",
+          "type": "string"
+        },
+        "checkpoint_file": {
+          "minLength": 1,
+          "title": "Checkpoint File",
+          "type": "string"
+        },
+        "checkpoint_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Checkpoint Sha256",
+          "type": "string"
+        },
+        "source": {
+          "const": "https://download.pytorch.org/models/r3d_18-b3b3357e.pth",
+          "title": "Source",
+          "type": "string"
+        },
+        "clip_frames": {
+          "const": 16,
+          "default": 16,
+          "title": "Clip Frames",
+          "type": "integer"
+        },
+        "sample_fps": {
+          "const": 15,
+          "default": 15,
+          "title": "Sample Fps",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "model",
+        "checkpoint_file",
+        "checkpoint_sha256",
+        "source"
+      ],
+      "title": "LocalVideoEncoder",
       "type": "object"
     },
     "Person2Config": {
@@ -755,8 +1193,11 @@
   "additionalProperties": false,
   "properties": {
     "contract_version": {
-      "const": "cmai-camera-result-1.0",
       "default": "cmai-camera-result-1.0",
+      "enum": [
+        "cmai-camera-result-1.0",
+        "cmai-camera-result-1.1"
+      ],
       "title": "Contract Version",
       "type": "string"
     },
@@ -856,6 +1297,17 @@
       },
       "title": "Limitations",
       "type": "array"
+    },
+    "action_assessments": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ActionEvidenceResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

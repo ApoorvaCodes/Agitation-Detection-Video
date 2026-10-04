@@ -31,6 +31,6 @@ def validate_candidates(p1_result, candidates, verifier=None, deduplicate=True):
     return deduplicate_events(results) if deduplicate else results
 
 
-def validate_p2_result(p1_result, p2_result, verifier=None):
-    candidates = candidates_from_p2(p2_result, p1_result)
+def validate_p2_result(p1_result, p2_result, verifier=None, action_assessments=None):
+    candidates = candidates_from_p2(p2_result, p1_result, action_assessments)
     return validate_candidates(p1_result, candidates, verifier)

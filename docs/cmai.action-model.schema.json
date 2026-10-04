@@ -1,0 +1,127 @@
+{
+  "$defs": {
+    "ActionCentroids": {
+      "additionalProperties": false,
+      "properties": {
+        "item_id": {
+          "title": "Item Id",
+          "type": "string"
+        },
+        "positive": {
+          "$ref": "#/$defs/Prototype"
+        },
+        "negative": {
+          "$ref": "#/$defs/Prototype"
+        }
+      },
+      "required": [
+        "item_id",
+        "positive",
+        "negative"
+      ],
+      "title": "ActionCentroids",
+      "type": "object"
+    },
+    "Embedding": {
+      "additionalProperties": false,
+      "properties": {
+        "space": {
+          "title": "Space",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Values",
+          "type": "array"
+        },
+        "valid": {
+          "items": {
+            "type": "boolean"
+          },
+          "title": "Valid",
+          "type": "array"
+        }
+      },
+      "required": [
+        "space",
+        "values",
+        "valid"
+      ],
+      "title": "Embedding",
+      "type": "object"
+    },
+    "Prototype": {
+      "additionalProperties": false,
+      "properties": {
+        "behaviour": {
+          "minLength": 1,
+          "title": "Behaviour",
+          "type": "string"
+        },
+        "embedding": {
+          "$ref": "#/$defs/Embedding"
+        },
+        "example_count": {
+          "minimum": 1,
+          "title": "Example Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "behaviour",
+        "embedding",
+        "example_count"
+      ],
+      "title": "Prototype",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "cmai-action-model-1.0",
+      "default": "cmai-action-model-1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "taxonomy_version": {
+      "const": "cmai-long-form-camera-v1",
+      "default": "cmai-long-form-camera-v1",
+      "title": "Taxonomy Version",
+      "type": "string"
+    },
+    "model_identity": {
+      "const": "masked_two_centroid_classifier_v1",
+      "default": "masked_two_centroid_classifier_v1",
+      "title": "Model Identity",
+      "type": "string"
+    },
+    "version": {
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    },
+    "encoder_identity": {
+      "additionalProperties": true,
+      "title": "Encoder Identity",
+      "type": "object"
+    },
+    "classes": {
+      "items": {
+        "$ref": "#/$defs/ActionCentroids"
+      },
+      "minItems": 1,
+      "title": "Classes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "version",
+    "encoder_identity",
+    "classes"
+  ],
+  "title": "ActionModel",
+  "type": "object"
+}

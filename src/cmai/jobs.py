@@ -12,13 +12,17 @@ from person2.contracts import Person2VideoResult
 
 
 class AnalysisJob:
-    def __init__(self, path, bundle, config):
+    def __init__(self, path, bundle, config, interactions=None):
         self.directory = Path(path).parent
         self.status_path = self.directory / "progress.json"
-        for name in ("progress.json", "perception.json", "candidates.json"):
+        for name in ("progress.json", "perception.json", "candidates.json", "action-assessments.json"):
             (self.directory / name).unlink(missing_ok=True)
         request = dict(path=str(path), p1_configuration=asdict(config), bundle=bundle.metadata.model_dump(mode="json"),
-                       bank=bundle.bank.model_dump(mode="json") if bundle.bank else None)
+                       bank=bundle.bank.model_dump(mode="json") if bundle.bank else None,
+                       bundle_sha256=bundle.bundle_sha256,
+                       action_model=bundle.action_model.model_dump(mode="json") if bundle.action_model else None,
+                       checkpoint_path=str(bundle.checkpoint_path) if bundle.checkpoint_path else None,
+                       interactions=interactions.model_dump(mode="json") if interactions else None)
         request_path = self.directory / "request.json"
         request_path.write_text(json.dumps(request))
         env = os.environ.copy()
@@ -62,6 +66,11 @@ class AnalysisJob:
         return (Person1VideoResult.model_validate_json((self.directory / "perception.json").read_text()),
                 Person2VideoResult.model_validate_json((self.directory / "candidates.json").read_text()))
 
+    def action_assessments(self):
+        from cmai.action_detection import ActionEvidenceResult
+        path = self.directory / "action-assessments.json"
+        return ActionEvidenceResult.model_validate_json(path.read_text()) if path.is_file() else None
 
-def start_analysis(path, bundle, config):
-    return AnalysisJob(path, bundle, config)
+
+def start_analysis(path, bundle, config, interactions=None):
+    return AnalysisJob(path, bundle, config, interactions)

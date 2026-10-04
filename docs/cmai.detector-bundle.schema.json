@@ -1,5 +1,60 @@
 {
   "$defs": {
+    "ActionAsset": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "const": "masked_two_centroid_classifier_v1",
+          "default": "masked_two_centroid_classifier_v1",
+          "title": "Model",
+          "type": "string"
+        },
+        "file": {
+          "minLength": 1,
+          "title": "File",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "sha256"
+      ],
+      "title": "ActionAsset",
+      "type": "object"
+    },
+    "ActionQuality": {
+      "additionalProperties": false,
+      "properties": {
+        "min_detection_confidence": {
+          "default": 0.6,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Detection Confidence",
+          "type": "number"
+        },
+        "min_landmark_visibility": {
+          "default": 0.7,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Landmark Visibility",
+          "type": "number"
+        },
+        "min_absent_contact_fraction": {
+          "default": 0.8,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Min Absent Contact Fraction",
+          "type": "number"
+        }
+      },
+      "title": "ActionQuality",
+      "type": "object"
+    },
     "DetectorRule": {
       "additionalProperties": false,
       "properties": {
@@ -31,6 +86,13 @@
           "maximum": 1,
           "title": "Min Evidence Fraction",
           "type": "number"
+        },
+        "contrast_margin": {
+          "default": 0,
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Contrast Margin",
+          "type": "number"
         }
       },
       "required": [
@@ -38,6 +100,51 @@
         "similarity_threshold"
       ],
       "title": "DetectorRule",
+      "type": "object"
+    },
+    "LocalVideoEncoder": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "const": "torchvision_r3d_18_kinetics400_v1",
+          "title": "Model",
+          "type": "string"
+        },
+        "checkpoint_file": {
+          "minLength": 1,
+          "title": "Checkpoint File",
+          "type": "string"
+        },
+        "checkpoint_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Checkpoint Sha256",
+          "type": "string"
+        },
+        "source": {
+          "const": "https://download.pytorch.org/models/r3d_18-b3b3357e.pth",
+          "title": "Source",
+          "type": "string"
+        },
+        "clip_frames": {
+          "const": 16,
+          "default": 16,
+          "title": "Clip Frames",
+          "type": "integer"
+        },
+        "sample_fps": {
+          "const": 15,
+          "default": 15,
+          "title": "Sample Fps",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "model",
+        "checkpoint_file",
+        "checkpoint_sha256",
+        "source"
+      ],
+      "title": "LocalVideoEncoder",
       "type": "object"
     },
     "Person2Config": {
@@ -179,8 +286,11 @@
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "const": "1.0",
       "default": "1.0",
+      "enum": [
+        "1.0",
+        "1.1"
+      ],
       "title": "Schema Version",
       "type": "string"
     },
@@ -264,6 +374,47 @@
       "anyOf": [
         {
           "$ref": "#/$defs/ReleaseEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "detector_mode": {
+      "default": "pose_motion_camera",
+      "enum": [
+        "pose_motion_camera",
+        "interaction_actions"
+      ],
+      "title": "Detector Mode",
+      "type": "string"
+    },
+    "declared_labels": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Declared Labels",
+      "type": "array"
+    },
+    "action_asset": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ActionAsset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "action_quality": {
+      "$ref": "#/$defs/ActionQuality"
+    },
+    "video_encoder": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LocalVideoEncoder"
         },
         {
           "type": "null"

@@ -178,3 +178,5 @@ metrics and no ranking. Model training, acceptance thresholds/approval, exact
 manual-edition verification, external evidence-path validation and any durable
 Supabase companion/reviewer schema remain pending. The existing Apple Silicon
 MediaPipe wheel metadata warning is documented in `PERSON3.md`.
+
+See [hitting/kicking candidate setup, event annotations and experiments](CMAI_ACTIONS.md) for the optional supervised action path. Items 07/08 remain unavailable by default pending permitted labelled data and release evidence.

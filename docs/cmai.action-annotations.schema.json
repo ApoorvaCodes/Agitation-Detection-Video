@@ -1,0 +1,266 @@
+{
+  "$defs": {
+    "ActionAnnotation": {
+      "additionalProperties": false,
+      "properties": {
+        "annotation_id": {
+          "minLength": 1,
+          "title": "Annotation Id",
+          "type": "string"
+        },
+        "item_id": {
+          "title": "Item Id",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "positive",
+            "negative",
+            "ambiguous"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "start_timestamp": {
+          "minimum": 0,
+          "title": "Start Timestamp",
+          "type": "number"
+        },
+        "end_timestamp": {
+          "exclusiveMinimum": 0,
+          "title": "End Timestamp",
+          "type": "number"
+        },
+        "target_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Id"
+        },
+        "target_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "person",
+                "self",
+                "object"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Kind"
+        }
+      },
+      "required": [
+        "annotation_id",
+        "item_id",
+        "outcome",
+        "start_timestamp",
+        "end_timestamp"
+      ],
+      "title": "ActionAnnotation",
+      "type": "object"
+    },
+    "ActionRecording": {
+      "additionalProperties": false,
+      "properties": {
+        "perception": {
+          "minLength": 1,
+          "title": "Perception",
+          "type": "string"
+        },
+        "person_id": {
+          "minLength": 1,
+          "title": "Person Id",
+          "type": "string"
+        },
+        "subject_id": {
+          "minLength": 1,
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "participant_subject_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Participant Subject Ids",
+          "type": "array"
+        },
+        "track_subject_ids": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Track Subject Ids",
+          "type": "object"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "split": {
+          "enum": [
+            "train",
+            "validation",
+            "test"
+          ],
+          "title": "Split",
+          "type": "string"
+        },
+        "recording_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Recording Sha256",
+          "type": "string"
+        },
+        "video": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Video"
+        },
+        "interaction_evidence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interaction Evidence"
+        },
+        "annotations": {
+          "items": {
+            "$ref": "#/$defs/ActionAnnotation"
+          },
+          "minItems": 1,
+          "title": "Annotations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "perception",
+        "person_id",
+        "subject_id",
+        "participant_subject_ids",
+        "track_subject_ids",
+        "session_id",
+        "split",
+        "recording_sha256",
+        "annotations"
+      ],
+      "title": "ActionRecording",
+      "type": "object"
+    },
+    "DatasetProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "annotation_protocol": {
+          "minLength": 1,
+          "title": "Annotation Protocol",
+          "type": "string"
+        },
+        "annotation_version": {
+          "minLength": 1,
+          "title": "Annotation Version",
+          "type": "string"
+        },
+        "license_or_permission": {
+          "minLength": 1,
+          "title": "License Or Permission",
+          "type": "string"
+        },
+        "label_agreement": {
+          "minLength": 1,
+          "title": "Label Agreement",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "annotation_protocol",
+        "annotation_version",
+        "license_or_permission",
+        "label_agreement"
+      ],
+      "title": "DatasetProvenance",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "cmai-action-annotations-1.0",
+      "default": "cmai-action-annotations-1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "taxonomy_version": {
+      "const": "cmai-long-form-camera-v1",
+      "default": "cmai-long-form-camera-v1",
+      "title": "Taxonomy Version",
+      "type": "string"
+    },
+    "detector_mode": {
+      "const": "interaction_actions",
+      "default": "interaction_actions",
+      "title": "Detector Mode",
+      "type": "string"
+    },
+    "provenance": {
+      "$ref": "#/$defs/DatasetProvenance"
+    },
+    "behaviours": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Behaviours",
+      "type": "array"
+    },
+    "recordings": {
+      "items": {
+        "$ref": "#/$defs/ActionRecording"
+      },
+      "minItems": 1,
+      "title": "Recordings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "provenance",
+    "behaviours",
+    "recordings"
+  ],
+  "title": "ActionManifest",
+  "type": "object"
+}

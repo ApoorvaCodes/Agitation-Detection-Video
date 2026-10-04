@@ -10,6 +10,7 @@ VERSION = "cmai-long-form-camera-v1"
 ROOT = Path(__file__).resolve().parents[2]
 INITIAL_ITEMS = {"cmai_01_pacing_aimless_wandering", "cmai_26_repetitious_mannerisms",
                  "cmai_29_general_restlessness"}
+ACTION_ITEMS = {"cmai_07_hitting", "cmai_08_kicking"}
 LEGACY_LABELS = {item.removeprefix("cmai_").split("_", 1)[1]: item for item in INITIAL_ITEMS}
 
 
@@ -62,3 +63,10 @@ def require_initial_items(labels):
         canonical_item(label)
         if label not in INITIAL_ITEMS:
             raise ValueError(f"item not enabled for pose/motion camera research: {label}")
+
+
+def require_action_items(labels):
+    for label in labels:
+        canonical_item(label)
+        if label not in ACTION_ITEMS:
+            raise ValueError(f"item not enabled for interaction action research: {label}")
