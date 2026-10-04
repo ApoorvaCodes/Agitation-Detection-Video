@@ -1,7 +1,7 @@
 {
-  "schema_version": "cmai-action-experiment-1.0",
-  "taxonomy_version": "cmai-long-form-camera-v1",
-  "status": "pending_labelled_data",
+  "schema_version": "cmai-runtime-validation-1.0",
+  "input_kind": "synthetic_mechanics_only",
+  "recording_sha256": "4abf25a87d2ad14463a6a18baf16d78dd3999e81121cb9f9531bfd91f4901874",
   "runtime": {
     "python": "3.11.15",
     "platform": "macOS-26.3-arm64-arm-64bit",
@@ -54,102 +54,30 @@
       "person2/prototypes.py": "14b4d987e4bfd8a195682498283774d8a3d6487997c2692404ea71b05b1a03ed"
     }
   },
-  "threshold_grid": [
-    0.6,
-    0.8,
-    0.9
-  ],
-  "contrast_margin_grid": [
-    0,
-    0.1,
-    0.2
-  ],
-  "variants": {
-    "pose_only": {
-      "status": "pending_labelled_data",
-      "configuration": {
-        "window_seconds": 1.0666666666666667,
-        "overlap": 0.75,
-        "max_gap_seconds": 0.35,
-        "min_frames": 3,
-        "min_valid_fraction": 0.8,
-        "min_shared_fraction": 0.5,
-        "similarity_threshold": 0.8,
-        "smoothing_alpha": 0.5,
-        "min_event_seconds": 0.2,
-        "pose_weight": 1.0,
-        "motion_weight": 0.0,
-        "video_weight": 0.0
-      },
-      "metrics": null
-    },
-    "motion_only": {
-      "status": "pending_labelled_data",
-      "configuration": {
-        "window_seconds": 1.0666666666666667,
-        "overlap": 0.75,
-        "max_gap_seconds": 0.35,
-        "min_frames": 3,
-        "min_valid_fraction": 0.8,
-        "min_shared_fraction": 0.5,
-        "similarity_threshold": 0.8,
-        "smoothing_alpha": 0.5,
-        "min_event_seconds": 0.2,
-        "pose_weight": 0.0,
-        "motion_weight": 1.0,
-        "video_weight": 0.0
-      },
-      "metrics": null
-    },
-    "pose_plus_motion": {
-      "status": "pending_labelled_data",
-      "configuration": {
-        "window_seconds": 1.0666666666666667,
-        "overlap": 0.75,
-        "max_gap_seconds": 0.35,
-        "min_frames": 3,
-        "min_valid_fraction": 0.8,
-        "min_shared_fraction": 0.5,
-        "similarity_threshold": 0.8,
-        "smoothing_alpha": 0.5,
-        "min_event_seconds": 0.2,
-        "pose_weight": 1.0,
-        "motion_weight": 1.0,
-        "video_weight": 0.0
-      },
-      "metrics": null
-    },
-    "temporal_pose_motion": {
-      "status": "pending_labelled_data",
-      "configuration": {
-        "window_seconds": 1.0666666666666667,
-        "overlap": 0.75,
-        "max_gap_seconds": 0.35,
-        "min_frames": 3,
-        "min_valid_fraction": 0.8,
-        "min_shared_fraction": 0.5,
-        "similarity_threshold": 0.8,
-        "smoothing_alpha": 0.5,
-        "min_event_seconds": 0.2,
-        "pose_weight": 1.0,
-        "motion_weight": 1.0,
-        "video_weight": 0.0
-      },
-      "metrics": null
-    }
-  },
-  "selection": null,
+  "python_executable": "/Users/abhigyanshekhar/Desktop/odu video/Agitation-Detection-Video/.venv/bin/python",
+  "detector_bundle_sha256": "aca2783ff316bccb663ed5d594d40df3cb367a67cd2f7cae0ed8256e8960bd55",
+  "yolo_checkpoint_sha256": "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1",
+  "status": "completed",
   "limitations": [
-    "No clinical validity, calibration, intent, injury or two-week frequency inference.",
-    "Contact evidence is independently reviewed/external; P1 does not detect contact or objects.",
-    "Two-centroid classifier is an engineering baseline, not an evaluated best representation.",
-    "Coverage counts overlapping annotated windows; no independent-window confidence interval is inferred.",
-    "Participant identities, permissions and contact provenance require dataset-owner audit.",
-    "Test is evaluated once per representation per command; freeze reports and avoid repeated test-guided development."
+    "Runtime smoke validation, not labelled detector performance or clinical validation.",
+    "Human identity, contact assertions, review decisions and action accuracy require separate inspection."
   ],
-  "video_comparison": {
-    "status": "pending_local_checkpoint",
-    "model": "torchvision_r3d_18_kinetics400_v1",
-    "metrics": null
+  "worker": {
+    "phase": "complete",
+    "message": "Video analysis completed.",
+    "progress": 1
+  },
+  "person_tracks": 0,
+  "observations": 0,
+  "pose_observations": 0,
+  "valid_landmarks": 0,
+  "candidates": 0,
+  "clip_statuses": [],
+  "enabled_items": [],
+  "abstention_counts": {
+    "scored": 0,
+    "low_quality": 0,
+    "no_prototypes": 0,
+    "insufficient_evidence": 0
   }
 }
