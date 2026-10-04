@@ -5,13 +5,19 @@ import re
 import urllib.error
 import urllib.request
 from person3.contracts import EvidencePacket, Verification
-from person3.taxonomy import taxonomy_labels
+from cmai.taxonomy import load_taxonomy
+
+
+def canonical_verification_labels() -> tuple[str, ...]:
+    """Return the only labels the remote verifier is allowed to discuss."""
+    return tuple(item.item_id for item in load_taxonomy().items)
 
 
 SYSTEM_PROMPT = ("You validate supplied behavioural evidence for a research review. This is not diagnosis. "
                  "Do not diagnose the person, invent evidence, or invent timestamps. Use only the supplied evidence packet. "
-                 "Use the supplied behaviour label exactly; the accepted project vocabulary is: "
-                 + "; ".join(taxonomy_labels()) + ". Decide supported, unsupported, or insufficient_evidence. "
+                 "Use the supplied canonical CMAI item ID exactly; the accepted project vocabulary is: "
+                 + "; ".join(canonical_verification_labels()) + ". Items marked unavailable or outside the camera scope "
+                 "must remain insufficient_evidence. Decide supported, unsupported, or insufficient_evidence. "
                  "Return JSON with decision, reason, and evidence_segment_ids listing only supplied IDs that support the decision. "
                  "Never include hidden reasoning.")
 

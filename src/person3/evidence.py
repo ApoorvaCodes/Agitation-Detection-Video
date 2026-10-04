@@ -1,6 +1,7 @@
 """Build small, traceable evidence packets from P1 observations and P2 events."""
 from person3.contracts import CandidateBehaviour, EvidencePacket, EvidenceSegment
 from person3.taxonomy import normalize_behaviour
+from cmai.taxonomy import canonical_item
 
 
 def observation_id(person_id: str, frame_index: int) -> str:
@@ -29,8 +30,15 @@ def build_evidence_packet(candidate: CandidateBehaviour, person) -> EvidencePack
         quality["contact_evidence"] = [e for e in candidate.evidence.get("contacts", []) if e["frame_index"] == o.frame_index]
         rows.append(EvidenceSegment(evidence_id=oid, timestamp=o.timestamp, frame_index=o.frame_index,
                                     motion_features=relevant, pose=pose, quality_flags=quality))
-    taxonomy_item = normalize_behaviour(candidate.behaviour)
-    label = taxonomy_item.label if taxonomy_item else candidate.behaviour
+    # Remote verification receives the strict camera taxonomy ID.  Legacy P2
+    # labels remain readable locally, but are migrated at this boundary.
+    try:
+        label = canonical_item(candidate.behaviour, allow_legacy=True)
+    except ValueError:
+        # Preserve the established Person 3 display-label contract for
+        # legacy/non-camera candidates; CMAI IDs take the strict branch above.
+        taxonomy_item = normalize_behaviour(candidate.behaviour)
+        label = taxonomy_item.label if taxonomy_item else candidate.behaviour
     return EvidencePacket(person_id=candidate.person_id, candidate_id=candidate.candidate_id,
                           behaviour=label, candidate_score=candidate.candidate_score,
                           candidate_start=candidate.start_timestamp, candidate_end=candidate.end_timestamp,

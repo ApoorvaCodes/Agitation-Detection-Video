@@ -1,12 +1,17 @@
 """Deterministic CMAI-aware evidence quality checks."""
 from person3.taxonomy import normalize_behaviour
+from cmai.taxonomy import canonical_item
 
 
 def validate_packet(packet):
     flags = []
-    item = normalize_behaviour(packet.behaviour)
-    if item is None:
-        return False, ["behaviour_not_in_cmai_taxonomy"]
+    try:
+        item_id = canonical_item(packet.behaviour, allow_legacy=True)
+    except ValueError:
+        legacy = normalize_behaviour(packet.behaviour)
+        if legacy is None:
+            return False, ["behaviour_not_in_cmai_taxonomy"]
+        item_id = {"hitting": "cmai_07_hitting", "kicking": "cmai_08_kicking"}.get(legacy.key, legacy.key)
     if not packet.segments:
         return False, ["no_source_observations"]
     if len(packet.segments) < 2:
@@ -14,8 +19,8 @@ def validate_packet(packet):
     usable = [s for s in packet.segments if s.quality_flags.get("pose_detected") and not s.quality_flags.get("bbox_interpolated")]
     if len(usable) < 2:
         return False, ["insufficient_pose_quality"]
-    if item.key in {"hitting", "kicking"}:
-        limbs = {"left_hand", "right_hand"} if item.key == "hitting" else {"left_foot", "right_foot"}
+    if item_id in {"cmai_07_hitting", "cmai_08_kicking"}:
+        limbs = {"left_hand", "right_hand"} if item_id == "cmai_07_hitting" else {"left_foot", "right_foot"}
         contacts = [e for s in usable for e in s.quality_flags.get("contact_evidence", [])
                     if e.get("person_id") == packet.person_id and e.get("frame_index") == s.frame_index
                     and e.get("contact") == "observed" and e.get("limb") in limbs

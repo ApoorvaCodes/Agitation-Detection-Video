@@ -61,8 +61,18 @@ behaviour.
 On the tested Apple Silicon machine, `pip check` reports MediaPipe 0.10.21 as
 unsupported because its internal wheel metadata declares an x86_64 tag, despite
 the [published universal2 wheel](https://pypi.org/project/mediapipe/0.10.21/).
-Native MediaPipe Pose initialization and YOLO tracking smoke checks both passed.
 This packaging warning remains; no dependency metadata was rewritten to hide it.
+The estimator uses MediaPipe's legacy `mp.solutions.pose.Pose` CPU graph and
+does not request a GPU API explicitly. In a headless macOS process, MediaPipe
+0.10.21 can nevertheless fail while creating its internal `kGpuService` with
+`Could not create an NSOpenGLPixelFormat`. This is a WindowServer/OpenGL
+context limitation of that execution environment, not a missing `solutions`
+module or a silent pose-estimation fallback. Run the real-video smoke test from
+a logged-in graphical macOS session with WindowServer access, using the same
+interpreter as Streamlit; a container/SSH/headless runner cannot be claimed to
+have completed the MediaPipe stage. The focused estimator test covers the
+adapter's constructor arguments and landmark visibility/presence mapping, but
+does not claim native model initialization.
 
 **Video** is the default input. The dashboard automatically loads a detector
 bundle, validates/decodes video in a cancellable subprocess and runs P1 → P2
