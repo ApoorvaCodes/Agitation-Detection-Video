@@ -9,9 +9,11 @@ requires-python = ">=3.10"
 dependencies = ["numpy>=1.24,<3", "opencv-python>=4.8", "pydantic>=2.0,<3"]
 
 [project.optional-dependencies]
-models = ["ultralytics>=8.2", "mediapipe>=0.10"]
+# Person 1 uses the legacy mp.solutions.pose API, present in this tested release.
+models = ["ultralytics>=8.2", "mediapipe==0.10.21", "lap>=0.5.12"]
 test = ["pytest>=8"]
-dashboard = ["streamlit>=1.36", "pandas>=2", "plotly>=5"]
+# This range supports MediaPipe's protobuf<5 requirement for video processing.
+dashboard = ["streamlit>=1.36,<1.46", "pandas>=2", "plotly>=5"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

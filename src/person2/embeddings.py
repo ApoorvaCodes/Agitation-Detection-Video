@@ -21,7 +21,7 @@ def space_id(kind, names, settings=None):
 
 
 def packed(space, values):
-    valid = [v is not None and np.isfinite(v) for v in values]
+    valid = [bool(v is not None and np.isfinite(v)) for v in values]
     return Embedding(space=space, values=[float(v) if ok else 0.0 for v, ok in zip(values, valid)],
                      valid=valid)
 

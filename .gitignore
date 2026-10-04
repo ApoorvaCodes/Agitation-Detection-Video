@@ -10,3 +10,4 @@ __pycache__/
 *.webm
 *.pt
 *.onnx
+.streamlit/secrets.toml
