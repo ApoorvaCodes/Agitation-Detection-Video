@@ -22,6 +22,15 @@ Install with:
 pip install -e '.[models,test]'
 ```
 
+The model extra is pinned to the validated Apple Silicon/Python 3.12 stack:
+Ultralytics 8.3.0, Torch 2.3.1, torchvision 0.18.1, MediaPipe 0.10.21,
+OpenCV 4.10, NumPy 1.26, protobuf 4.x, and lapx 0.10.0. Install it in the
+same environment used to launch Streamlit. Check that environment with:
+
+```sh
+PYTHONPATH=src python scripts/diagnose_runtime.py
+```
+
 ## Run the video dashboard
 
 ```sh
@@ -29,6 +38,11 @@ source .venv/bin/activate
 python -m pip install -e '.[dashboard,models,test]'
 python -m streamlit run dashboard.py
 ```
+
+The `python` in both commands must be the same interpreter. The YOLO checkpoint
+`yolo11n.pt` is downloaded by Ultralytics on first use when it is not supplied
+as a local model path; model weights are never committed. The dashboard does
+not silently fall back to IoU tracking when ByteTrack or BoT-SORT is configured.
 
 Upload a video and click **Analyse video**. The app runs Person 1 perception and
 Person 2 candidate generation without requiring result JSON uploads. Enter your

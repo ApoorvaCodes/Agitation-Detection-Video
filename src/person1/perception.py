@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 from typing import Any, Protocol
+import importlib.metadata
+import importlib.util
+import sys
 from person1.errors import DetectionError, ModelLoadError, PoseEstimationError
 
 MEDIAPIPE_LANDMARK_NAMES = ["nose", "left_eye_inner", "left_eye", "left_eye_outer", "right_eye_inner", "right_eye", "right_eye_outer", "left_ear", "right_ear", "mouth_left", "mouth_right", "left_shoulder", "right_shoulder", "left_elbow", "right_elbow", "left_wrist", "right_wrist", "left_pinky", "right_pinky", "left_index", "right_index", "left_thumb", "right_thumb", "left_hip", "right_hip", "left_knee", "right_knee", "left_ankle", "right_ankle", "left_heel", "right_heel", "left_foot_index", "right_foot_index"]
@@ -15,12 +18,36 @@ class Detector(Protocol):
 class PoseEstimator(Protocol):
     def estimate(self, crop: Any) -> PoseResult | None: ...
 
+def runtime_diagnostics(model_name: str, tracker: str) -> dict[str, str]:
+    """Return the runtime facts needed to diagnose model-loading failures."""
+    try:
+        version = importlib.metadata.version("ultralytics")
+    except importlib.metadata.PackageNotFoundError:
+        version = "not installed"
+    return {
+        "python_executable": sys.executable,
+        "python_version": sys.version.split()[0],
+        "ultralytics_importable": str(importlib.util.find_spec("ultralytics") is not None).lower(),
+        "ultralytics_version": version,
+        "model": model_name,
+        "tracker": tracker,
+    }
+
+def _model_load_error(model_name: str, tracker: str, exc: Exception) -> ModelLoadError:
+    details = runtime_diagnostics(model_name, tracker)
+    if isinstance(exc, ModuleNotFoundError) and exc.name == "ultralytics":
+        action = "Launch Streamlit with the same Python interpreter where Ultralytics is installed (python -m streamlit), or install the project's [models] extra in that environment."
+    else:
+        action = "Verify the model file/network access and the project's [models] dependency versions in this same Python environment."
+    facts = ", ".join(f"{key}={value}" for key, value in details.items())
+    return ModelLoadError(f"Could not load tracking model {model_name!r}: {exc}. {facts}. {action}")
+
 class UltralyticsPersonDetector:
     def __init__(self, model_name: str, confidence: float, iou: float):
         try:
             from ultralytics import YOLO
             self.model = YOLO(model_name)
-        except Exception as exc: raise ModelLoadError(f"Could not load YOLO model {model_name!r}: {exc}") from exc
+        except Exception as exc: raise _model_load_error(model_name, "detector", exc) from exc
         self.confidence, self.iou = confidence, iou
     def detect(self, image: Any) -> list[Detection]:
         try:
@@ -34,7 +61,7 @@ class UltralyticsPersonTracker:
         try:
             from ultralytics import YOLO
             self.model = YOLO(model_name); self.confidence=confidence; self.iou=iou; self.tracker=f"{tracker}.yaml"
-        except Exception as exc: raise ModelLoadError(f"Could not load tracking model {model_name!r}: {exc}") from exc
+        except Exception as exc: raise _model_load_error(model_name, tracker, exc) from exc
     def detect_tracks(self, image: Any) -> list[tuple[str, Detection]]:
         try:
             result=self.model.track(image, persist=True, tracker=self.tracker, conf=self.confidence, iou=self.iou, classes=[0], verbose=False)[0]; h,w=image.shape[:2]

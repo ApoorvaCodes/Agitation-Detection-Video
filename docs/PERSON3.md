@@ -41,7 +41,7 @@ Deduplication first collapses duplicate non-supported results for the same candi
 Use Python 3.11 for the tested video dependencies:
 
 ```sh
-python3.11 -m venv .venv  # only if it does not exist
+python3.12 -m venv .venv  # only if it does not exist
 source .venv/bin/activate
 python -m pip install -e '.[dashboard,models,test]'
 python -m streamlit run dashboard.py
@@ -52,6 +52,11 @@ depend on an editable-install path being added to `sys.path`. The model extra
 pins MediaPipe 0.10.21 for Person 1's existing legacy Pose API; the dashboard
 range supports its protobuf dependency. The configured YOLO checkpoint is
 downloaded on first use if absent. No labelled prototype bank is bundled.
+
+Run `PYTHONPATH=src python scripts/diagnose_runtime.py` from the activated
+environment if model loading fails. It reports the exact Python executable,
+Ultralytics import/version, model name, and tracker without changing fallback
+behaviour.
 
 On the tested Apple Silicon machine, `pip check` reports MediaPipe 0.10.21 as
 unsupported because its internal wheel metadata declares an x86_64 tag, despite
