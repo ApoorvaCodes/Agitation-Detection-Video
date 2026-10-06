@@ -216,3 +216,46 @@ error per matched event), plus permission/protocol/evidence-path and named appro
 These thresholds are not invented here. Each item must pass independently; creating
 a research bundle does not release it. Human review and clinical validation remain
 Person 3/project-review responsibilities.
+
+## Native Mac validation (2026-10-04)
+
+This Mac's MediaPipe 0.10.21 initialization failed in the restricted execution
+sandbox with `Could not create an NSOpenGLPixelFormat` / `kGpuService`. The same
+local environment successfully initialized and processed a blank RGB frame when
+run outside the sandbox, using OpenGL 2.1 Metal on Apple M4. This is an execution
+access issue on this host, not evidence that its graphical runtime cannot work.
+Do not replace measured poses with synthetic data to work around that failure.
+
+A native mechanics run then completed actual YOLO/ByteTrack, MediaPipe
+initialization, P2 aggregation, companion schema parsing and ZIP export using the
+existing local `yolo11n.pt` and a generated non-human two-second clip. It found
+zero tracks/poses/candidates. This proves limited runtime mechanics only. Human
+tracking/pose quality, track continuity, action accuracy and human review on real
+footage remain unvalidated.
+
+Run this command from a normal Terminal in the logged-in graphical Mac session,
+using a permitted local video and a fresh output directory:
+
+```sh
+source .venv/bin/activate
+PYTHONPATH=src python -m cmai.runtime_validation \
+  --input /absolute/permitted/video.mp4 \
+  --output-dir /absolute/local/validation-run-001 \
+  --bundle configs/cmai_action_detector_bundle.json
+```
+
+`--config` accepts the existing Person1 YAML and requires an existing local YOLO
+checkpoint, avoiding automatic model downloads. A trained action bundle can be
+supplied with `--bundle` and independent source-linked contact JSON via
+`--interactions`. The command preserves runtime/code/model hashes, worker status,
+P1/P2 and camera results, per-status coverage, track/pose counts, clip statuses
+and the evidence ZIP. It rejects nonempty output directories and exits nonzero
+on worker failure. `runtime-report.json` explicitly distinguishes failed and
+completed runs. A completed run with zero candidates does not establish a
+behaviour negative; check enabled items and coverage/abstentions.
+
+Before declaring real-video validation complete, inspect actual source frames:
+correct actor/target association, visible wrists/ankles, valid masks, timestamp
+alignment, gaps/swaps, evidence clip boundaries and reviewer/export persistence.
+Then evaluate permitted labelled events with the experiment command above. Merely
+initializing a model or passing unit tests cannot satisfy those checks.
