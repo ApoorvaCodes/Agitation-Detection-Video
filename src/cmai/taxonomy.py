@@ -69,6 +69,28 @@ def camera_observable_ids(taxonomy=None):
     return frozenset(item.item_id for item in camera_observable_items(taxonomy))
 
 
+def validate_canonical_cmai_behaviour(cmai_id, cmai_name=None, *, taxonomy=None,
+                                      allowed_ids=None):
+    """Validate and canonicalize a physical-video behaviour.
+
+    The returned name is always read from the versioned taxonomy.  Caller
+    supplied names are checked only for consistency and are never trusted for
+    display.  Unknown, non-camera, and disallowed IDs fail closed.
+    """
+    taxonomy = taxonomy or load_taxonomy()
+    if not isinstance(cmai_id, str) or not cmai_id.strip():
+        raise ValueError("canonical CMAI ID is required")
+    item = taxonomy.item(cmai_id)
+    if item.camera_status not in CAMERA_OBSERVABLE_STATUSES:
+        raise ValueError("CMAI item is not observable from physical video")
+    allowed = set(allowed_ids) if allowed_ids is not None else INITIAL_ITEMS | ACTION_ITEMS
+    if item.item_id not in allowed:
+        raise ValueError("CMAI item is not enabled for this physical-video pipeline")
+    if cmai_name is not None and cmai_name != item.display_name:
+        raise ValueError("canonical CMAI name does not match the taxonomy")
+    return item
+
+
 def canonical_item(label, *, allow_legacy=False):
     item_id = LEGACY_LABELS.get(label, label) if allow_legacy else label
     return load_taxonomy().item(item_id).item_id

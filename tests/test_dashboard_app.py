@@ -66,7 +66,7 @@ def test_video_button_runs_both_stages_and_does_not_verify_without_candidates(mo
         assert not app.error, [e.value for e in app.error]
         analyze.assert_called_once()
         assert any("Video analysis completed" in x.value for x in app.success)
-        assert any("Physical behaviour detector is not configured" in x.value for x in app.warning)
+        assert any("No supported physical behaviour candidate" in x.value for x in app.info)
         assert not any("Cursing or verbal aggression" in x.value for x in app.text)
         assert not any(b.label == "Verify candidates with Groq" for b in app.button)
 

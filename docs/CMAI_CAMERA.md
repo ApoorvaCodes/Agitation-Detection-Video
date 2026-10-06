@@ -60,6 +60,26 @@ Supabase saves remain separate explicit actions with an opt-in checkbox, using
 the existing machine-review table. Human decisions are currently persisted in
 local JSON/ZIP exports, not silently mapped into the old Supabase schema.
 
+## Demo physical-behaviour rules
+
+For a tangible local demonstration, the normal Video flow also runs the
+separate `demo_physical_behaviour_rules_v1` layer from
+`configs/demo_physical_behaviour.json`. It consumes only the uploaded video's
+P1 pose/motion observations and can emit conservative, timestamped candidates
+for hitting-like motion, kicking-like motion, pacing, repetitive mannerisms,
+or general restlessness. Each candidate is marked `DEMO_ONLY`, includes the
+measured supporting feature values, and uses the canonical CMAI item ID where
+one exists. Its evidence-strength value is not a probability or clinical
+confidence. Contact is not inferred from pose alone, and ambiguous or
+low-quality tracks abstain.
+
+This layer is not a released or clinically validated CMAI detector. It does not
+use filenames, video paths, track IDs, fixed timestamps, synthetic landmarks,
+or a predetermined demo label. Qwen/Groq remains an optional verifier of
+generated candidates; it cannot create candidates or change their taxonomy.
+Keep these rules in the separate demo config rather than the production
+detector bundle.
+
 ## Detector availability and assets
 
 The app automatically loads `configs/cmai_detector_bundle.json`, or the local

@@ -29,6 +29,65 @@
           },
           "title": "Chunk Ids",
           "type": "array"
+        },
+        "detector_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detector Name"
+        },
+        "candidate_status": {
+          "default": "MODEL_CANDIDATE",
+          "enum": [
+            "MODEL_CANDIDATE",
+            "DEMO_ONLY"
+          ],
+          "title": "Candidate Status",
+          "type": "string"
+        },
+        "score_semantics": {
+          "default": "uncalibrated_cosine_similarity",
+          "enum": [
+            "uncalibrated_cosine_similarity",
+            "demo_rule_evidence_strength_not_probability"
+          ],
+          "title": "Score Semantics",
+          "type": "string"
+        },
+        "evidence": {
+          "additionalProperties": true,
+          "title": "Evidence",
+          "type": "object"
+        },
+        "canonical_cmai_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Canonical Cmai Id"
+        },
+        "canonical_cmai_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Canonical Cmai Name"
         }
       },
       "required": [

@@ -317,6 +317,30 @@
           "title": "Cmai Item Id",
           "type": "string"
         },
+        "canonical_cmai_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Canonical Cmai Id"
+        },
+        "canonical_cmai_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Canonical Cmai Name"
+        },
         "model_status": {
           "const": "candidate",
           "default": "candidate",
@@ -351,8 +375,11 @@
           "type": "number"
         },
         "score_semantics": {
-          "const": "uncalibrated_cosine_similarity",
           "default": "uncalibrated_cosine_similarity",
+          "enum": [
+            "uncalibrated_cosine_similarity",
+            "demo_rule_evidence_strength_not_probability"
+          ],
           "title": "Score Semantics",
           "type": "string"
         },
@@ -481,6 +508,19 @@
           },
           "title": "Contacts",
           "type": "array"
+        },
+        "demo_evidence": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Demo Evidence"
         }
       },
       "required": [

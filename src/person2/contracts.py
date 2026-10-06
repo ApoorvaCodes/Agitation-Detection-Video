@@ -56,6 +56,12 @@ class BehaviourEvent(Contract):
     end_timestamp: float = Field(ge=0)
     peak_similarity: float = Field(ge=-1, le=1)
     chunk_ids: list[str]
+    detector_name: str | None = None
+    candidate_status: Literal["MODEL_CANDIDATE", "DEMO_ONLY"] = "MODEL_CANDIDATE"
+    score_semantics: Literal["uncalibrated_cosine_similarity", "demo_rule_evidence_strength_not_probability"] = "uncalibrated_cosine_similarity"
+    evidence: dict = Field(default_factory=dict)
+    canonical_cmai_id: str | None = None
+    canonical_cmai_name: str | None = None
 
     @model_validator(mode="after")
     def check_interval(self):

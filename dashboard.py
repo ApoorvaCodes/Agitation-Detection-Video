@@ -27,6 +27,7 @@ from cmai.taxonomy import camera_observable_ids, load_taxonomy
 from cmai.results import (build_camera_result, review_event, create_evidence, export_archive, attach_machine_reviews)
 from cmai.jobs import start_analysis
 from cmai.interactions import InteractionEvidence
+from cmai.demo_physical_behaviour import DemoPhysicalBehaviourConfig
 
 
 def clear_results():
@@ -71,15 +72,20 @@ def render_camera_result(p1, p2, bundle):
     st.subheader("Physical behaviour results")
     st.caption("Only canonical behaviours observable from physical camera evidence are shown. Qwen verification uses extracted pose/motion evidence, not the original video.")
     enabled_physical = {rule.item_id for rule in bundle.metadata.rules if rule.item_id in physical_ids}
-    if not enabled_physical:
+    demo_enabled = DemoPhysicalBehaviourConfig.from_path().enabled
+    demo_events = [event for person in p2.persons for event in person.events
+                   if event.candidate_status == "DEMO_ONLY" and event.behaviour in physical_ids]
+    if not enabled_physical and not demo_enabled:
         st.warning("Physical behaviour detector is not configured. No physical behaviour result can be produced.")
+    elif demo_events:
+        st.info("Demo physical-behaviour rules are active. Results are evidence-driven demonstrations, not clinically validated CMAI classifications.")
     display_events = [event for event in result.events if event.cmai_item_id in physical_ids]
-    if enabled_physical and not display_events:
-        st.info("No supported CMAI physical behaviour was detected in this video.")
+    if (enabled_physical or demo_enabled) and not display_events:
+        st.info("No supported physical behaviour candidate was detected in this video.")
     else:
         st.dataframe([{
             "Person": event.evidence.person_id,
-            "Behaviour": names[event.cmai_item_id],
+            "Behaviour": taxonomy.item(event.canonical_cmai_id or event.cmai_item_id).display_name,
             "Start": event.start_timestamp,
             "End": event.end_timestamp,
             "Status": {"supported": "verified", "unsupported": "rejected",

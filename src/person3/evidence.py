@@ -1,7 +1,7 @@
 """Build small, traceable evidence packets from P1 observations and P2 events."""
 from person3.contracts import CandidateBehaviour, EvidencePacket, EvidenceSegment
 from person3.taxonomy import normalize_behaviour
-from cmai.taxonomy import canonical_item
+from cmai.taxonomy import canonical_item, validate_canonical_cmai_behaviour
 
 
 def observation_id(person_id: str, frame_index: int) -> str:
@@ -30,6 +30,10 @@ def build_evidence_packet(candidate: CandidateBehaviour, person) -> EvidencePack
         quality["contact_evidence"] = [e for e in candidate.evidence.get("contacts", []) if e["frame_index"] == o.frame_index]
         rows.append(EvidenceSegment(evidence_id=oid, timestamp=o.timestamp, frame_index=o.frame_index,
                                     motion_features=relevant, pose=pose, quality_flags=quality))
+    # Demo candidates must already carry a strict canonical ID; no free-text
+    # demo label is allowed to cross into the dashboard/Qwen path.
+    if candidate.evidence.get("status") == "DEMO_ONLY":
+        validate_canonical_cmai_behaviour(candidate.behaviour)
     # Remote verification receives the strict camera taxonomy ID.  Legacy P2
     # labels remain readable locally, but are migrated at this boundary.
     try:
@@ -70,6 +74,11 @@ def candidates_from_p2(p2_result, p1_result, action_assessments=None) -> list[Ca
                 source_observation_ids=[observation_id(p2_person.person_id, o.frame_index) for o in rows],
                 evidence={"p2_peak_similarity": event.peak_similarity},
             )
+            if getattr(event, "candidate_status", "MODEL_CANDIDATE") == "DEMO_ONLY":
+                candidate.evidence.update(getattr(event, "evidence", {}),
+                                          detector=getattr(event, "detector_name", None),
+                                          status=event.candidate_status,
+                                          score_semantics=event.score_semantics)
             if action_assessments is not None:
                 contacts = {e.evidence_id:e.model_dump(mode="json") for a in action_assessments.assessments
                             if a.person_id == p2_person.person_id and a.item_id == event.behaviour
