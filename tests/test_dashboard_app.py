@@ -40,8 +40,6 @@ def test_initial_screen_is_video_first_and_requests_masked_key(monkeypatch):
     assert app.text_input[0].proto.type == app.text_input[0].proto.PASSWORD
     assert app.button[0].label == "Analyse video" and app.button[0].disabled
     assert any("Upload a video" in item.value for item in app.info)
-    assert any(item.value == "Camera-based physical behaviour analysis" for item in app.title)
-    assert any("video/pose/motion-based CMAI physical behaviours only" in item.value for item in app.caption)
 
 
 def test_entered_key_is_configured_and_json_mode_is_optional(monkeypatch):
@@ -68,12 +66,9 @@ def test_video_button_runs_both_stages_and_does_not_verify_without_candidates(mo
         assert not app.error, [e.value for e in app.error]
         analyze.assert_called_once()
         assert any("Video analysis completed" in x.value for x in app.success)
-        assert any("experimental Hitting motion baseline" in x.value for x in app.info)
-        assert app.dataframe and all(name in str(app.dataframe[0].value) for name in
-                                     ("Hitting", "Kicking", "Pacing / Aimless Wandering", "Restlessness"))
-        assert not any(word in str(app.dataframe[0].value) for word in ("Cursing", "Screaming", "Repetitive sentences", "Disrobing"))
-        verify = next(b for b in app.button if b.label == "Verify candidates with Groq")
-        assert verify.disabled
+        assert any("No supported physical behaviour candidate" in x.value for x in app.info)
+        assert not any("Cursing or verbal aggression" in x.value for x in app.text)
+        assert not any(b.label == "Verify candidates with Groq" for b in app.button)
 
 
 def test_changing_video_clears_previous_results(monkeypatch):

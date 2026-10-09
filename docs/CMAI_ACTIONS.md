@@ -55,7 +55,7 @@ can replace this candidate source without changing the P1/P2/P3 event handoff.
 
 ## Run immediately
 
-Use Python 3.11 and the existing environment. No Groq key is required for local
+Use Python 3.12 and the existing environment. No Groq key is required for local
 analysis; Groq remains an optional explicit machine review in the sidebar.
 
 ```sh

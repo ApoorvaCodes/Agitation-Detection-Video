@@ -1,7 +1,7 @@
-# Versions used to validate the Person 2 implementation (Python 3.11).
+# Versions used to validate the Person 2 implementation (Python 3.12).
 # These pins reproduce the software environment, not empirical model results.
-numpy==2.4.6
-opencv-python==5.0.0.93
+numpy==1.26.4
+opencv-python==4.10.0.84
 pydantic==2.13.5
 pydantic-core==2.46.5
 annotated-types==0.8.0

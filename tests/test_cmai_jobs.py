@@ -26,6 +26,13 @@ def test_corrupt_recording_reports_precise_error_before_models(tmp_path):
         job.cancel()
 
 
+def test_worker_classifies_mediapipe_initialization_errors():
+    from cmai.worker import error_stage
+    from person1.errors import ModelLoadError, PoseEstimationError
+    assert error_stage(ModelLoadError("NSOpenGLPixelFormat")) == "P1/MediaPipe"
+    assert error_stage(PoseEstimationError("pose graph")) == "P1/MediaPipe"
+
+
 def test_cancellation_terminates_worker_and_discards_partial_outputs(tmp_path):
     path = tmp_path / "source.mp4"
     path.write_bytes(b"fixture")

@@ -45,10 +45,18 @@ as a local model path; model weights are never committed. The dashboard does
 not silently fall back to IoU tracking when ByteTrack or BoT-SORT is configured.
 
 Upload a video and click **Analyse video**. The app runs Person 1 perception and
-Person 2 candidate generation without requiring result JSON uploads. Enter your
-Groq API key in the password field in the sidebar to enable **Verify candidates
-with Groq**; `GROQ_API_KEY` or Streamlit secrets also work. Verification sends
-selected pose/motion evidence, not the raw video, only when requested.
+Person 2 candidate generation without requiring result JSON uploads. If P2
+produces candidates and a Groq key is configured, P3/Qwen verification starts
+automatically; without a key, candidates remain explicitly unverified.
+`GROQ_API_KEY` or Streamlit secrets also work. Verification sends structured
+pose/motion evidence, not the raw video.
+
+The dashboard also includes a separate demo-only physical-behaviour rule layer
+(`configs/demo_physical_behaviour.json`) that derives timestamped hitting-like,
+kicking-like, pacing, repetitive-mannerism, or restlessness candidates from P1
+motion evidence. Candidates are visibly marked `DEMO_ONLY`; evidence strength
+is not confidence, and no clinical CMAI claim is made. The rules abstain when
+the measured evidence is insufficient and do not key on filenames or track IDs.
 
 The app automatically loads `configs/cmai_detector_bundle.json`, or a local
 bundle selected through `CMAI_DETECTOR_BUNDLE`. No evaluated behaviour assets are

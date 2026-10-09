@@ -28,6 +28,7 @@ class CandidateEvidence(Contract):
     clip_status: Literal["pending", "available", "unavailable"] = "pending"
     clip_start_timestamp: float | None = Field(default=None, ge=0)
     contacts: list[ContactObservation] = Field(default_factory=list)
+    demo_evidence: dict | None = None
 
     @model_validator(mode="after")
     def safe_references(self):
@@ -54,13 +55,15 @@ class CameraEvent(Contract):
     event_id: str = Field(min_length=1)
     taxonomy_version: Literal["cmai-long-form-camera-v1"] = VERSION
     cmai_item_id: str
+    canonical_cmai_id: str | None = None
+    canonical_cmai_name: str | None = None
     # Model result remains immutable when a human reviews the event.
     model_status: Literal["candidate"] = "candidate"
     status: Literal["candidate", "reviewed_confirmed", "reviewed_rejected", "uncertain"] = "candidate"
     start_timestamp: float = Field(ge=0)
     end_timestamp: float = Field(gt=0)
     score: float = Field(ge=-1, le=1)
-    score_semantics: Literal["uncalibrated_cosine_similarity", "heuristic_motion_score"] = "uncalibrated_cosine_similarity"
+    score_semantics: Literal["uncalibrated_cosine_similarity", "heuristic_motion_score", "demo_rule_evidence_strength_not_probability"] = "uncalibrated_cosine_similarity"
     source_label: str
     source_candidate_id: str
     evidence: CandidateEvidence
@@ -73,6 +76,10 @@ class CameraEvent(Contract):
     @model_validator(mode="after")
     def check_event(self):
         item = load_taxonomy().item(self.cmai_item_id)
+        from cmai.taxonomy import validate_canonical_cmai_behaviour
+        canonical = validate_canonical_cmai_behaviour(self.cmai_item_id, self.canonical_cmai_name)
+        if self.canonical_cmai_id is not None and self.canonical_cmai_id != canonical.item_id:
+            raise ValueError("canonical CMAI ID does not match the taxonomy")
         if item.camera_status in {"not_camera_only", "out_of_initial_scope"}:
             raise ValueError("camera-ineligible items cannot be emitted as events")
         if self.end_timestamp <= self.start_timestamp:
@@ -190,7 +197,9 @@ class CameraResult(Contract):
                         or not features.get("acceptance_reasons")):
                     raise ValueError("movement events require source-grounded experimental detector evidence")
             optional_contact_hitting = e.cmai_item_id == "cmai_07_hitting"
-            if e.cmai_item_id in ACTION_ITEMS and not motion_baseline and not optional_contact_hitting:
+            demo_event = (e.score_semantics == "demo_rule_evidence_strength_not_probability"
+                          and e.evidence.demo_evidence is not None)
+            if e.cmai_item_id in ACTION_ITEMS and not motion_baseline and not demo_event and not optional_contact_hitting:
                 contacts = e.evidence.contacts
                 supported = {c.evidence_id:c for a in self.action_assessments.assessments
                              if a.person_id == e.evidence.person_id and a.item_id == e.cmai_item_id
@@ -198,21 +207,21 @@ class CameraResult(Contract):
                              for c in a.contacts} if self.action_assessments else {}
                 if any(c.limb not in LIMBS[e.cmai_item_id] or supported.get(c.evidence_id) != c for c in contacts):
                     raise ValueError("action contact must match the limb and scored assessments")
-                if not contacts or any(c.person_id != e.evidence.person_id or c.contact != "observed"
+                if not demo_event and (not contacts or any(c.person_id != e.evidence.person_id or c.contact != "observed"
                                        or not c.target_visible or not c.actor_limb_visible
                                        or c.frame_index not in e.evidence.frame_indices
-                                       or not e.start_timestamp <= c.timestamp < e.end_timestamp for c in contacts):
+                                       or not e.start_timestamp <= c.timestamp < e.end_timestamp for c in contacts)):
                     raise ValueError("action candidate requires visible, source-linked observed contact")
-                if len({(c.target_kind,c.target_id) for c in contacts}) != 1:
+                if not demo_event and len({(c.target_kind,c.target_id) for c in contacts}) != 1:
                     raise ValueError("action event cannot merge different targets")
-            if e.cmai_item_id not in rules and not motion_baseline:
+            if e.cmai_item_id not in rules and not (motion_baseline or demo_event):
                 raise ValueError("event item has no enabled detector")
             if e.evidence.video_id != self.video_id or e.evidence.person_id not in people:
                 raise ValueError("event evidence refers to another video/person")
             if not set(e.evidence.chunk_ids) <= set(people[e.evidence.person_id]):
                 raise ValueError("event evidence refers to unknown chunks")
             chunks = [people[e.evidence.person_id][cid] for cid in e.evidence.chunk_ids]
-            if any(c.status != "scored" for c in chunks) and not motion_baseline:
+            if any(c.status != "scored" and not ((demo_event or motion_baseline) and c.status in {"low_quality", "no_prototypes"}) for c in chunks):
                 raise ValueError("event cannot claim abstained chunks as supporting evidence")
             if len({c.segment_id for c in chunks}) != 1:
                 raise ValueError("event cannot bridge a track gap")

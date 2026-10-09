@@ -59,7 +59,12 @@ class BehaviourEvent(Contract):
     candidate_source: Literal["prototype", "motion_baseline"] = "prototype"
     arm_side: Literal["left", "right"] | None = None
     candidate_score: float | None = Field(default=None, ge=0, le=1)
+    detector_name: str | None = None
+    candidate_status: Literal["MODEL_CANDIDATE", "DEMO_ONLY"] = "MODEL_CANDIDATE"
+    score_semantics: Literal["uncalibrated_cosine_similarity", "demo_rule_evidence_strength_not_probability"] = "uncalibrated_cosine_similarity"
     evidence: dict[str, Any] = Field(default_factory=dict)
+    canonical_cmai_id: str | None = None
+    canonical_cmai_name: str | None = None
 
     @model_validator(mode="after")
     def check_interval(self):

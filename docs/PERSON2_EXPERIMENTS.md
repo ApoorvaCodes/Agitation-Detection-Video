@@ -16,7 +16,7 @@ Qwen/Groq, CMAI validation, verification, clips, dashboard, and Supabase.
 
 ## Setup and commands
 
-From the repository root, use Python 3.11 and the tested dependency pins:
+From the repository root, use Python 3.12 and the tested dependency pins:
 
 ```sh
 python3.11 -m venv .venv

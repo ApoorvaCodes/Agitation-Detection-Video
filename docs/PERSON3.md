@@ -38,7 +38,7 @@ Deduplication first collapses duplicate non-supported results for the same candi
 
 `person3.clips.extract_event_clip` extracts a supported event with default two-second padding, clamps to video boundaries, preserves source timestamps in the event metadata and writes `{event_id}.mp4`. Decode or writer failures return no clip. Source videos are not modified; generated videos are covered by `.gitignore`.
 
-Use Python 3.11 for the tested video dependencies:
+Use Python 3.12 for the tested video dependencies:
 
 ```sh
 python3.12 -m venv .venv  # only if it does not exist
@@ -83,12 +83,14 @@ An optional labelled prototype upload is a research override, not release approv
 
 Choose a track, inspect timestamped candidates/reference frames/clips, and save
 confirmed/rejected/uncertain human decisions separately from model output.
-Candidates can be reviewed before Groq. Enter the key in the masked sidebar
-field (entry > secrets > environment), then explicitly click **Verify candidates
-with Groq**. Only the chosen track's compact pose/motion evidence is sent; key
-entry alone does not test a connection. Machine verification is separate from
-human confirmation. A key/model change clears machine results, preserving human
-reviews. API failure is unknown evidence, never a negative classification.
+In the normal Video flow, candidates are sent automatically to Groq/Qwen when a
+key is configured. Without a key, candidates remain explicitly unverified.
+Only structured pose/motion evidence is sent; the key is never sent to the
+worker and the raw video is not uploaded to Groq. Machine verification is
+separate from human confirmation. A key/model change clears machine results,
+preserving human reviews. API failure is unknown evidence, never a negative
+classification. The advanced JSON flow retains an explicit verification
+control for developer review.
 
 Legacy JSON review remains under **Existing results (advanced)**. Only explicit
 aliases 01, 26 and 29 migrate into camera results. Original asset/evaluation

@@ -8,7 +8,8 @@ import math
 
 from cmai.contracts import (CameraEvent, CameraResult, CandidateEvidence, CandidateQuality,
                             CoverageInterval, ItemAvailability, ReviewDecision, TrackCoverage)
-from cmai.taxonomy import canonical_item, load_taxonomy, MOVEMENT_BASELINE_ITEMS
+from cmai.taxonomy import (canonical_item, load_taxonomy,
+                           validate_canonical_cmai_behaviour, MOVEMENT_BASELINE_ITEMS)
 from person2.embeddings import encoder_metadata
 from person2.hitting import HittingConfig
 
@@ -50,7 +51,15 @@ def build_camera_result(p1, p2, bundle, source_sha256=None, action_assessments=N
                                    for c in person.chunks]))
         chunks = {c.chunk_id: c for c in person.chunks}
         for index, event in enumerate(person.events):
-            item_id = canonical_item(event.behaviour, allow_legacy=True)
+            demo_event = event.candidate_status == "DEMO_ONLY"
+            try:
+                item_id = event.canonical_cmai_id if demo_event else canonical_item(event.behaviour, allow_legacy=True)
+                item = validate_canonical_cmai_behaviour(item_id,
+                    event.canonical_cmai_name if demo_event else None)
+            except ValueError:
+                # Invalid/free-text candidates are an abstention, never a
+                # user-facing behaviour label.
+                continue
             selected = [chunks[cid] for cid in event.chunk_ids]
             frames = {f for c in selected for f in c.frame_indices}
             rows = [o for o in observations if o.frame_index in frames
@@ -73,12 +82,14 @@ def build_camera_result(p1, p2, bundle, source_sha256=None, action_assessments=N
             score = event.candidate_score if event.candidate_score is not None else event.peak_similarity
             events.append(CameraEvent(event_id=sha256(event_key.encode()).hexdigest()[:24],
                           cmai_item_id=item_id, source_label=event.behaviour,
+                          canonical_cmai_id=item.item_id, canonical_cmai_name=item.display_name,
                           source_candidate_id=candidate_id,
                           start_timestamp=event.start_timestamp, end_timestamp=event.end_timestamp,
                           score=score,
-                          score_semantics="heuristic_motion_score" if motion_baseline else "uncalibrated_cosine_similarity",
+                          score_semantics=("heuristic_motion_score" if motion_baseline else event.score_semantics),
                           evidence=CandidateEvidence(video_id=p1.video.video_id, person_id=person.person_id,
-                                    chunk_ids=event.chunk_ids, frame_indices=sorted({o.frame_index for o in rows}), contacts=contacts),
+                                    chunk_ids=event.chunk_ids, frame_indices=sorted({o.frame_index for o in rows}), contacts=contacts,
+                                    demo_evidence=event.evidence if demo_event else None),
                           quality=CandidateQuality(min_valid_fraction=min(c.valid_fraction for c in selected)),
                           evidence_check={"status": "reviewable" if reviewable else "insufficient_evidence",
                                           "quality_flags": flags, "source_evidence_ids": [s.evidence_id for s in packet.segments],

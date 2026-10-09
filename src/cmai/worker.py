@@ -10,9 +10,20 @@ from cmai.detection import detect_with_assessments
 from cmai.action_model import ActionModel
 from cmai.interactions import InteractionEvidence
 from person1.config import Person1Config
+from person1.errors import DetectionError, ModelLoadError, PoseEstimationError
 from person1.ingestion import VideoLoader
 from person1.pipeline import process_video
 from person2.contracts import PrototypeBank
+
+
+def error_stage(exc):
+    if isinstance(exc, (ModelLoadError, PoseEstimationError)):
+        return "P1/MediaPipe"
+    if isinstance(exc, DetectionError):
+        return "P1/YOLO/tracking"
+    if isinstance(exc, ValueError):
+        return "P2/contract or detector configuration"
+    return "video analysis"
 
 
 def run(request_path):
@@ -42,6 +53,7 @@ def run(request_path):
                 progress("running", f"Tracking and pose at {timestamp:.1f} / {meta.duration_seconds:.1f} seconds", .85*timestamp/meta.duration_seconds)
                 last = time.monotonic()
 
+        progress("running", "Stage 1/3 — Video perception: detection, tracking, pose and motion features.", .05)
         p1 = process_video(request["path"], Person1Config(**request["p1_configuration"]), progress_callback=on_frame)
         sample_fps = request["p1_configuration"]["frame_sample_fps"] or meta.fps
         if final_timestamp is None or final_timestamp < meta.duration_seconds - max(2/sample_fps, 2/meta.fps):
@@ -57,6 +69,7 @@ def run(request_path):
         interactions = InteractionEvidence.model_validate(request["interactions"]) if request.get("interactions") else None
         bundle = LoadedBundle(metadata, bank, request.get("bundle_sha256") or sha256(metadata.model_dump_json().encode()).hexdigest(), model, checkpoint)
         recording_hash = sha256(Path(request["path"]).read_bytes()).hexdigest()
+        progress("running", "Stage 2/3 — Physical behaviour candidate detection.", .9)
         p2, assessments = detect_with_assessments(p1, bundle, interactions, request["path"], recording_hash)
         if assessments is not None:
             (directory / "action-assessments.json").write_text(assessments.model_dump_json())
@@ -64,7 +77,7 @@ def run(request_path):
         (directory / "candidates.json").write_text(p2.model_dump_json())
         progress("complete", "Video analysis completed.", 1)
     except Exception as exc:
-        progress("error", f"Video analysis could not complete: {type(exc).__name__}: {exc}")
+        progress("error", f"{error_stage(exc)} failed: {type(exc).__name__}: {exc}")
 
 
 if __name__ == "__main__":

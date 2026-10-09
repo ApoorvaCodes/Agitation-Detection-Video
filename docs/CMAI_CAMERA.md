@@ -16,7 +16,7 @@ require a new taxonomy version and a migration.
 
 ## Setup and upload
 
-Use the existing Python 3.11 environment:
+Use the existing Python 3.12 environment:
 
 ```sh
 source .venv/bin/activate
@@ -49,14 +49,36 @@ inputs cancels pending work and removes previous temporary files. Browser/sessio
 loss is not durable storage. Cancellation of a worker on abrupt server/browser
 failure is not guaranteed; normal UI cancellation/input changes are handled.
 
-Groq is optional. Enter its API key in the masked sidebar field and explicitly
-click **Verify candidates with Groq**. Only candidates for the chosen track are
-sent, as compact pose/motion evidence. No raw video is sent. The Qwen decision
+Groq is optional. Enter its API key in the masked sidebar field. In the normal
+Video flow, candidates are sent automatically to Qwen when the key is present;
+the advanced JSON flow retains an explicit verification control. Only
+candidates for the chosen track are sent in the advanced flow, as compact
+pose/motion evidence. No raw video is sent. The Qwen decision
 and its provider/model identity are stored as `machine_validation`; it never marks a human review confirmed.
 Changing the key/model clears machine verification, preserving human decisions.
 Supabase saves remain separate explicit actions with an opt-in checkbox, using
 the existing machine-review table. Human decisions are currently persisted in
 local JSON/ZIP exports, not silently mapped into the old Supabase schema.
+
+## Demo physical-behaviour rules
+
+For a tangible local demonstration, the normal Video flow also runs the
+separate `demo_physical_behaviour_rules_v1` layer from
+`configs/demo_physical_behaviour.json`. It consumes only the uploaded video's
+P1 pose/motion observations and can emit conservative, timestamped candidates
+for hitting-like motion, kicking-like motion, pacing, repetitive mannerisms,
+or general restlessness. Each candidate is marked `DEMO_ONLY`, includes the
+measured supporting feature values, and uses the canonical CMAI item ID where
+one exists. Its evidence-strength value is not a probability or clinical
+confidence. Contact is not inferred from pose alone, and ambiguous or
+low-quality tracks abstain.
+
+This layer is not a released or clinically validated CMAI detector. It does not
+use filenames, video paths, track IDs, fixed timestamps, synthetic landmarks,
+or a predetermined demo label. Qwen/Groq remains an optional verifier of
+generated candidates; it cannot create candidates or change their taxonomy.
+Keep these rules in the separate demo config rather than the production
+detector bundle.
 
 ## Detector availability and assets
 

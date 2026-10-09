@@ -205,10 +205,10 @@ items, item frequencies, severity, or a total score.
 
 Person 2 retains its labeled prototype similarity path and also runs the explicitly
 experimental Hitting motion baseline on timestamped P1 normalized pose observations.
-This baseline does not require a prototype bank or contact annotations. It emits
-Experimental `cmai_01_pacing_aimless_wandering` and `cmai_29_general_restlessness`
-events use the same `motion_baseline` source marker and include a detector
-version, source observation IDs/timestamps, accepted features, and reasons.
+This baseline does not require a prototype bank or contact annotations. Experimental
+`cmai_01_pacing_aimless_wandering` and `cmai_29_general_restlessness` events use
+the same `motion_baseline` source marker and include a detector version, source
+observation IDs/timestamps, accepted features, and reasons.
 The optional per-track `movement_diagnostics` map records accepted-window
 features or abstention reasons. Hitting events retain `candidate_source:
 "motion_baseline"`, the actor's

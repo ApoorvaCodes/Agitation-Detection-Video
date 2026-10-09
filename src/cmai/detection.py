@@ -108,7 +108,19 @@ def detect_with_assessments(source, bundle, interactions=None, video_path=None, 
     if bundle.metadata.detector_mode == "interaction_actions":
         from cmai.action_detection import apply_action_rules
         return apply_action_rules(result, source, bundle, interactions, recording_sha256)
-    return apply_rules(result, bundle.metadata.rules, source), None
+    result = apply_rules(result, bundle.metadata.rules, source)
+    from cmai.demo_physical_behaviour import DemoPhysicalBehaviourDetector
+    demo_detector = DemoPhysicalBehaviourDetector()
+    result = demo_detector.detect(result, source)
+    print("DEMO DETECTOR STATUS", flush=True)
+    print({"enabled": demo_detector.config.enabled,
+           "config_path": "configs/demo_physical_behaviour.json",
+           "config_loaded": True, "detector_instantiated": True,
+           "tracks_received": len(source.persons),
+           "observations_received": sum(len(p.observations) for p in source.persons),
+           "windows_evaluated": sum(len(p.windows) for p in source.persons),
+           "candidates_generated": sum(len(p.events) for p in result.persons)}, flush=True)
+    return result, None
 
 
 def detect(source, bundle, **kwargs):
