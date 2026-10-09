@@ -178,9 +178,12 @@ class CameraResult(Contract):
             if len({c.chunk_id for c in track.intervals}) != len(track.intervals):
                 raise ValueError("duplicate chunk IDs in track coverage")
         for e in self.events:
-            motion_baseline = (e.cmai_item_id in MOVEMENT_BASELINE_ITEMS or e.cmai_item_id == "cmai_07_hitting"
-                               and e.evidence_check.get("candidate_source") == "motion_baseline")
-            if e.cmai_item_id in MOVEMENT_BASELINE_ITEMS:
+            demo_event = (e.score_semantics == "demo_rule_evidence_strength_not_probability"
+                          and e.evidence.demo_evidence is not None)
+            motion_baseline = (not demo_event and (e.cmai_item_id in MOVEMENT_BASELINE_ITEMS
+                              or e.cmai_item_id == "cmai_07_hitting"
+                              and e.evidence_check.get("candidate_source") == "motion_baseline"))
+            if e.cmai_item_id in MOVEMENT_BASELINE_ITEMS and not demo_event:
                 expected_detector = ("pacing_trajectory_v1" if e.cmai_item_id == "cmai_01_pacing_aimless_wandering"
                                      else "restlessness_pose_motion_v1")
                 features = e.evidence_check.get("motion_features", {})
@@ -197,8 +200,6 @@ class CameraResult(Contract):
                         or not features.get("acceptance_reasons")):
                     raise ValueError("movement events require source-grounded experimental detector evidence")
             optional_contact_hitting = e.cmai_item_id == "cmai_07_hitting"
-            demo_event = (e.score_semantics == "demo_rule_evidence_strength_not_probability"
-                          and e.evidence.demo_evidence is not None)
             if e.cmai_item_id in ACTION_ITEMS and not motion_baseline and not demo_event and not optional_contact_hitting:
                 contacts = e.evidence.contacts
                 supported = {c.evidence_id:c for a in self.action_assessments.assessments
