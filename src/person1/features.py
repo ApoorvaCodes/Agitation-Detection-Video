@@ -70,6 +70,12 @@ def enrich_observations(observations, max_gap_seconds: float, min_delta_time: fl
             if usable and fv["acceleration"]: previous_acceleration[joint]=_point(fv["acceleration"])
             elif not usable: previous.pop(f"{joint}._velocity",None); previous_acceleration.pop(joint,None)
             if point is not None: previous[joint]=point
+            else:
+                # Never bridge a missing landmark with the next sampled frame:
+                # the global dt belongs to adjacent observations, not the gap
+                # since this joint was last visible.
+                previous.pop(joint,None); previous.pop(f"{joint}._velocity",None)
+                previous_acceleration.pop(joint,None)
         centroid=_mean_point([current[x] for x in ("left_hip","right_hip") if current.get(x)]) or _mean_point([current[x] for x in ("left_shoulder","right_shoulder") if current.get(x)])
         old_centroid=previous.get("_centroid"); centroid_fv=vector_features(centroid,old_centroid,previous.get("_centroid_velocity"),dt,min_delta_time) if centroid else {"displacement":None,"velocity":None,"acceleration":None}
         if centroid and usable:

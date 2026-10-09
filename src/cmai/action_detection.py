@@ -54,9 +54,22 @@ def evidence_gate(source, person, chunk, rule, quality, interactions):
     if chunk.status == "low_quality" or not observations or sum(bool(s) for s in usable.values())/len(observations) < rule.min_evidence_fraction:
         return "low_quality", "Insufficient visible limb/motion or track quality.", False, []
     if interactions is None:
+        if rule.item_id == "cmai_07_hitting":
+            return "scored", "Independent contact is optional for the Hitting arm-motion candidate.", False, []
         return "contact_unavailable", "No independent target/contact evidence provider is configured.", False, []
     rows = [e for e in interactions.observations if e.person_id == person.person_id and e.frame_index in frames
             and e.limb in LIMBS[rule.item_id]]
+    if rule.item_id == "cmai_07_hitting":
+        people = {p.person_id: {o.frame_index:o for o in p.observations} for p in source.persons}
+        contacts = [e for e in rows if e.contact == "observed" and e.target_visible and e.actor_limb_visible
+                    and e.limb.split("_")[0] in usable.get(e.frame_index,set())
+                    and (e.target_kind == "object" or e.target_id not in people
+                         or (e.frame_index in people[e.target_id]
+                             and not people[e.target_id][e.frame_index].quality.bbox_interpolated
+                             and people[e.target_id][e.frame_index].detection_confidence >= quality.min_detection_confidence))]
+        if contacts and len({(e.target_kind,e.target_id) for e in contacts}) == 1:
+            return "scored", "Arm motion scored; independently reviewed contact is optional supporting evidence.", True, contacts
+        return "scored", "Arm motion scored without usable contact annotations; contact is optional.", False, []
     if not rows:
         return "contact_unavailable", "No target/contact evidence for this action window.", False, []
     people = {p.person_id: {o.frame_index:o for o in p.observations} for p in source.persons}
@@ -84,7 +97,7 @@ def apply_action_rules(result, source, bundle, interactions=None, recording_sha2
     people = {p.person_id:p for p in source.persons}
     classes = {c.item_id:c for c in bundle.action_model.classes} if bundle.action_model else {}
     for person in result.persons:
-        events = []
+        events = [event for event in person.events if event.candidate_source == "motion_baseline"]
         for rule in bundle.metadata.rules:
             support, history, previous_segment, previous_end, target = [], None, None, None, None
 
@@ -111,15 +124,25 @@ def apply_action_rules(result, source, bundle, interactions=None, recording_sha2
                     status, reason = "incompatible_evidence", "Required video frames/features are unavailable; no silent modality fallback."
                 if status == "scored" and positive is None:
                     status, reason = "incompatible_evidence", "Insufficient shared valid embedding coordinates for both centroids."
-                current_target = (rows[0].target_kind, rows[0].target_id) if contact else None
+                # Hitting's arm-motion baseline/action score does not require
+                # target contact. Optional contact annotations therefore must
+                # not split its temporal support when they change or go unclear.
+                if rule.item_id == "cmai_07_hitting":
+                    # Keep the last reviewed target through missing/unclear
+                    # optional contact rows, but respect an observed target change.
+                    current_target = (rows[0].target_kind, rows[0].target_id) if contact else target
+                else:
+                    current_target = (rows[0].target_kind, rows[0].target_id) if contact else None
                 if chunk.segment_id != previous_segment or current_target != target or (previous_end is not None and chunk.start_timestamp > previous_end) or status != "scored":
                     history = None
                 score.similarity = positive if status == "scored" else None
                 score.shared_fraction = shared
                 if score.similarity is not None:
+                    chunk.status = "scored"
                     history = positive if history is None else result.configuration.smoothing_alpha*positive+(1-result.configuration.smoothing_alpha)*history
                 score.smoothed_similarity = history if status == "scored" else None
-                score.candidate = bool(status == "scored" and contact and min(positive, history) >= rule.similarity_threshold
+                contact_ok = contact or rule.item_id == "cmai_07_hitting"
+                score.candidate = bool(status == "scored" and contact_ok and min(positive, history) >= rule.similarity_threshold
                                        and margin >= rule.contrast_margin)
                 if not score.candidate or previous_segment != chunk.segment_id or current_target != target or (previous_end is not None and chunk.start_timestamp > previous_end):
                     finish(chunk.start_timestamp)
@@ -137,7 +160,12 @@ def apply_action_rules(result, source, bundle, interactions=None, recording_sha2
         for chunk in person.chunks:
             if chunk.status == "scored" and not any(s.similarity is not None for s in chunk.scores):
                 chunk.status = "insufficient_evidence"
-        person.events = sorted(events,key=lambda e:(e.start_timestamp,e.behaviour))
+        baseline_events = [e for e in events if e.candidate_source == "motion_baseline"]
+        rule_events = [e for e in events if e.candidate_source != "motion_baseline"
+                       and not (e.behaviour == "cmai_07_hitting" and any(
+                           b.start_timestamp < e.end_timestamp and e.start_timestamp < b.end_timestamp
+                           for b in baseline_events))]
+        person.events = sorted([*baseline_events,*rule_events],key=lambda e:(e.start_timestamp,e.behaviour,e.arm_side or ""))
     return result, ActionEvidenceResult(video_id=source.video.video_id, recording_sha256=recording_sha256,
                         provider_identity={"provider_id":interactions.provider_id,"provider_version":interactions.provider_version,
                                            "method":interactions.method,"annotation_protocol":interactions.annotation_protocol} if interactions else None,

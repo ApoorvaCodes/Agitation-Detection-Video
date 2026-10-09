@@ -12,6 +12,8 @@ from person2.embeddings import (VideoEncoder, StatsPoseEncoder, TemporalPoseEnco
                                 motion_embedding, space_id, usable_pose)
 from person1.features import KEY_JOINTS
 from person2.prototypes import cosine_similarity
+from person2.hitting import HittingConfig, analyze_hitting
+from person2.movement_patterns import MovementPatternConfig, analyze_movement_patterns
 
 
 def aggregate_events(chunks, config):
@@ -54,8 +56,12 @@ def aggregate_events(chunks, config):
 def process_perception(source: Person1VideoResult, config: Person2Config | None = None,
                        prototypes: PrototypeBank | None = None,
                        video_encoder: VideoEncoder | None = None,
-                       pose_encoder: VideoEncoder | None = None) -> Person2VideoResult:
+                       pose_encoder: VideoEncoder | None = None,
+                       hitting_config: HittingConfig | None = None,
+                       movement_config: MovementPatternConfig | None = None) -> Person2VideoResult:
     config = config or Person2Config()
+    hitting_config = hitting_config or HittingConfig.load()
+    movement_config = movement_config or MovementPatternConfig.load()
     pose_encoder = pose_encoder or StatsPoseEncoder()
     if isinstance(pose_encoder, TemporalPoseEncoder) and pose_encoder.window_seconds != config.window_seconds:
         raise ValueError("temporal encoder duration must match pipeline window_seconds")
@@ -141,8 +147,49 @@ def process_perception(source: Person1VideoResult, config: Person2Config | None 
                                       status=status, embeddings=embeddings, fused_embedding=fused,
                                       motion_features=summary, scores=scores))
             previous_segment = chunk.segment_id
+        events = aggregate_events(chunks, config)
+        if hitting_config.enabled:
+            hitting_events, diagnostics = analyze_hitting(person, hitting_config)
+            diagnostics["total_frames_processed"] = source.diagnostics.get("frames_processed", source.video.frame_count)
+            diagnostics["total_source_video_frames"] = source.video.frame_count
+            for key,value in source.diagnostics.items():
+                diagnostics[f"p1_{key}"] = value
+            for chunk in chunks:
+                for key, value in diagnostics.items():
+                    chunk.motion_features[f"hitting.{key}"] = value
+                chunk.motion_features["hitting.baseline_enabled"] = 1.0
+            for candidate in hitting_events:
+                supporting = [chunk for chunk in chunks if chunk.end_timestamp > candidate["start_timestamp"]
+                              and chunk.start_timestamp < candidate["end_timestamp"]]
+                if not supporting:
+                    continue
+                matching = next((e for e in events if e.behaviour == candidate["behaviour"]
+                                 and e.start_timestamp < candidate["end_timestamp"]
+                                 and candidate["start_timestamp"] < e.end_timestamp), None)
+                if matching:
+                    matching.evidence["motion_baseline"] = candidate["evidence"]
+                    matching.arm_side = candidate["arm_side"]
+                    continue
+                events.append(BehaviourEvent(behaviour=candidate["behaviour"],
+                    start_timestamp=candidate["start_timestamp"],end_timestamp=candidate["end_timestamp"],
+                    peak_similarity=candidate["candidate_score"],chunk_ids=[c.chunk_id for c in supporting],
+                    candidate_source="motion_baseline",arm_side=candidate["arm_side"],
+                    candidate_score=candidate["candidate_score"],evidence=candidate["evidence"]))
+        movement_events, movement_diagnostics = analyze_movement_patterns(person, movement_config, sampling_fps=fps)
+        for detector, diagnostic in movement_diagnostics.items():
+            for key, value in diagnostic.items():
+                if isinstance(value, (int, float, bool)):
+                    for chunk in chunks:
+                        chunk.motion_features[f"{detector}.{key}"] = float(value)
+        for behaviour, start, end, score, evidence in movement_events:
+            supporting = [c for c in chunks if c.end_timestamp > start and c.start_timestamp < end]
+            if supporting:
+                events.append(BehaviourEvent(behaviour=behaviour, start_timestamp=start, end_timestamp=end,
+                    peak_similarity=score, chunk_ids=[c.chunk_id for c in supporting], candidate_source="motion_baseline",
+                    candidate_score=score, evidence=evidence))
         persons.append(PersonResult(person_id=person.person_id, chunks=chunks,
-                                    events=aggregate_events(chunks, config)))
+                                    movement_diagnostics=movement_diagnostics,
+                                    events=sorted(events,key=lambda e:(e.start_timestamp,e.behaviour,e.arm_side or ""))))
     return Person2VideoResult(video_id=source.video.video_id, configuration=asdict(config),
                              embedding_spaces=spaces, prototype_version=prototypes.version if prototypes else None,
                              persons=persons)

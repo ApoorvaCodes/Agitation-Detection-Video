@@ -114,7 +114,7 @@ approval/authentication service. Local signed-off configuration is trusted.
 
 ## Candidate detection semantics
 
-Only 01, 26 and 29 are supported for initial research. Each rule has its own
+Items 01, 26 and 29 are supported for initial prototype research. Each rule has its own
 threshold, minimum consecutive chunks (at least two), minimum event duration
 and minimum evidence fraction. Raw and EMA scores must both pass; smoothing
 alone cannot count as a fresh observation. Chunk gaps, quality failures and
@@ -135,6 +135,47 @@ prototypes and empirical evaluation must establish candidate specificity. The
 current representations may confuse purposeful walking, ordinary posture
 changes and calm motion with targets. Bilateral visibility requirements may
 abstain conservatively. No object-interaction or audio detector is included.
+
+### Experimental movement baselines
+
+The camera dashboard also runs two separate experimental P2 detectors without
+requiring labelled prototype assets. They use the existing P1 source timestamps,
+session-local track boxes and normalized MediaPipe landmarks. Their availability
+is shown as `research_only`; the per-track diagnostics report missing duration,
+gaps, pose coverage and other abstention reasons.
+
+Pacing (`cmai_01_pacing_aimless_wandering`) compares consecutive person-box
+centres in person-size units. It requires sufficient duration and track coverage,
+minimum accumulated path, repeated direction reversals along the dominant axis,
+and revisits to previously traversed regions. It abstains on a single straight
+walk, stationary tracks, short tracks, poor coverage and large timestamp gaps.
+It cannot determine whether walking is purposeful or clinically agitated.
+
+Restlessness (`cmai_29_general_restlessness`) compares only visible,
+confidence-qualified normalized upper/lower body landmarks across adjacent valid
+poses. It requires repeated movement bursts and persistence, minimum pose
+coverage and track duration. It suppresses candidates for clear dominant-axis
+locomotion so walking is handled by the trajectory detector. Missing joints are
+omitted; motion is never interpolated across absent landmarks. Isolated gestures
+or one posture change are below the default burst requirement.
+
+Both default threshold sets are experimental engineering starting points, not
+clinical values. Configure them in `configs/movement_patterns.json`, or point
+`MOVEMENT_PATTERN_CONFIG` to a local JSON file. Defaults are: 12-second window,
+8-second minimum track, 0.65 minimum valid coverage, 0.40 minimum person-detection
+confidence, 1.5-second maximum gap,
+0.035 body-scale minimum path step, 2.0 body-scale minimum pacing path, 4-second
+minimum moving time, two direction reversals, 0.25 recurrence, 0.50 landmark visibility, four
+restlessness bursts, 0.20 movement persistence, 0.25 movement changes per
+second, eight valid pose frames, 0.07 body-scale movement and posture-change
+thresholds, and 0.72 locomotion path ratio. Candidate evidence
+contains detector version, source observation IDs/timestamps, features and
+acceptance reasons; per-track diagnostics preserve abstention reasons.
+
+Hitting and Kicking remain distinct: Hitting uses its experimental arm-motion
+baseline, while Kicking requires the existing action model and target/contact
+gate. The four dashboard rows are Hitting, Kicking, Pacing / Aimless Wandering
+and Restlessness. Audio-only behaviours are not included.
 
 All scores are `uncalibrated_cosine_similarity` in [-1,1], never confidence or
 probability. Camera-ineligible items are `not_assessed_by_camera`. Other items
@@ -161,7 +202,9 @@ unsupported chunks, gap bridging and intervals beyond source coverage fail
 validation. Clip failure leaves a candidate reviewable in the source video;
 it is never a negative outcome.
 
-P1, P2 result JSON and prototype-bank schema `1.0` are preserved. Training
+P1 result JSON and prototype-bank schema `1.0` are preserved. P2 schema `1.0`
+adds the optional `movement_diagnostics` map with a default empty value, so older
+P2 documents remain valid. Training
 manifests now use schema `2.0`, canonical IDs, explicit splits and label-agreement
 provenance. Old training manifests must be explicitly updated and re-audited;
 the runner never silently assumes missing `split` means training.

@@ -351,7 +351,10 @@
           "type": "number"
         },
         "score_semantics": {
-          "const": "uncalibrated_cosine_similarity",
+          "enum": [
+            "uncalibrated_cosine_similarity",
+            "heuristic_motion_score"
+          ],
           "default": "uncalibrated_cosine_similarity",
           "title": "Score Semantics",
           "type": "string"

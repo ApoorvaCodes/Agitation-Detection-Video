@@ -259,6 +259,10 @@ def legacy_result_bundle(result):
     labels = {canonical_item(s.behaviour, allow_legacy=True)
               for p in result.persons for c in p.chunks for s in c.scores}
     labels |= {canonical_item(e.behaviour, allow_legacy=True) for p in result.persons for e in p.events}
+    baseline_hitting = any(e.behaviour == "cmai_07_hitting" and e.candidate_source == "motion_baseline"
+                           for p in result.persons for e in p.events)
+    if baseline_hitting:
+        labels.discard("cmai_07_hitting")
     require_initial_items(labels)
     metadata = DetectorBundle(detector_id="legacy-person2-result-import", version=result.prototype_version or "unknown",
                               mode="legacy_review", configuration=result.configuration,

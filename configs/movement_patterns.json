@@ -1,0 +1,20 @@
+{
+  "window_seconds": 12.0,
+  "min_track_seconds": 8.0,
+  "min_valid_coverage": 0.65,
+  "min_detection_confidence": 0.4,
+  "max_gap_seconds": 1.5,
+  "min_step_body_scales": 0.035,
+  "min_pacing_path_body_scales": 2.0,
+  "min_movement_duration_seconds": 4.0,
+  "min_pacing_reversals": 2,
+  "min_recurrence": 0.25,
+  "pose_visibility": 0.5,
+  "min_restlessness_bursts": 4,
+  "min_moving_fraction": 0.2,
+  "min_movement_frequency_per_second": 0.25,
+  "min_pose_frames": 8,
+  "min_burst_motion_body_scales": 0.07,
+  "min_posture_change_body_scales": 0.07,
+  "locomotion_path_ratio": 0.72
+}

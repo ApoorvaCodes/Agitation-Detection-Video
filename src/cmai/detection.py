@@ -21,7 +21,7 @@ def has_evidence(observations, chunk, rule):
 def apply_rules(result, rules, source=None):
     """Require consecutive measured support; quality/track barriers break runs."""
     for person in result.persons:
-        events = []
+        events = [event for event in person.events if event.candidate_source == "motion_baseline"]
         for rule in rules:
             support, prior_segment, prior_end = [], None, None
             observations = {o.frame_index: o for p in source.persons if p.person_id == person.person_id
@@ -71,7 +71,7 @@ def apply_rules(result, rules, source=None):
         for chunk in person.chunks:
             if chunk.status == "scored" and not any(s.similarity is not None for s in chunk.scores):
                 chunk.status = "insufficient_evidence"
-        person.events = sorted(events, key=lambda e: (e.start_timestamp, e.behaviour))
+        person.events = sorted(events, key=lambda e: (e.start_timestamp, e.behaviour, e.arm_side or ""))
     return result
 
 
@@ -102,7 +102,8 @@ def detect_with_assessments(source, bundle, interactions=None, video_path=None, 
         from cmai.video_actions import LocalR3DEncoder
         video_encoder = LocalR3DEncoder(video_path, bundle.checkpoint_path, bundle.metadata.video_encoder, interactions, source)
     if extracted_result is None:
-        result = process_perception(source, bundle.metadata.configuration, bundle.bank,
+        prototypes = None if bundle.metadata.detector_mode == "interaction_actions" else bundle.bank
+        result = process_perception(source, bundle.metadata.configuration, prototypes,
                                 pose_encoder=bundle.pose_encoder(), video_encoder=video_encoder)
     if bundle.metadata.detector_mode == "interaction_actions":
         from cmai.action_detection import apply_action_rules

@@ -59,7 +59,8 @@ def test_default_bundle_abstains_and_reports_all_items():
     data = source()
     result = build_camera_result(data, detect(data, bundle), bundle)
     assert not result.events and len(result.availability) == 29
-    assert all(a.status in {"unavailable", "not_assessed_by_camera"} for a in result.availability)
+    assert next(a.status for a in result.availability if a.cmai_item_id == "cmai_07_hitting") == "research_only"
+    assert all(a.status in {"unavailable", "not_assessed_by_camera", "research_only"} for a in result.availability)
     assert all(i.status in {"no_prototypes", "low_quality"} for c in result.coverage for i in c.intervals)
     assert CameraResult.model_validate_json(result.model_dump_json()) == result
 

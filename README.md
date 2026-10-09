@@ -52,8 +52,10 @@ selected pose/motion evidence, not the raw video, only when requested.
 
 The app automatically loads `configs/cmai_detector_bundle.json`, or a local
 bundle selected through `CMAI_DETECTOR_BUNDLE`. No evaluated behaviour assets are
-bundled yet: the default result marks behaviours unavailable or not assessed by
-camera, preserves coverage/abstentions, and does not invent labels. A prototype
+bundled yet: the default result marks prototype-based behaviours unavailable or
+not assessed by camera, while experimental Hitting, Pacing and Restlessness
+baselines remain clearly marked research-only. The app preserves abstentions and
+does not invent labels. A prototype
 upload under **Behaviour references (optional)** is an advanced research override.
 
 Select a person track, inspect timestamped candidates and source evidence, save
@@ -64,3 +66,15 @@ retains compatible P1/P2 JSON review. See [camera setup and contract](docs/CMAI_
 and [Person 2 experiments](docs/PERSON2_EXPERIMENTS.md).
 
 See [hitting/kicking candidate setup, event annotations and experiments](docs/CMAI_ACTIONS.md) for the optional supervised action path. Items 07/08 remain unavailable by default pending permitted labelled data and release evidence.
+
+The camera review lists Hitting, Kicking, Pacing / Aimless Wandering and
+Restlessness. Pacing measures repeated, reversible track trajectories;
+Restlessness measures repeated pose movement and excludes clear walking. Both
+new movement-pattern detectors use experimental defaults in
+`configs/movement_patterns.json`; they produce review candidates, not clinical
+conclusions. Their source evidence and abstention diagnostics appear with the
+track review. Run the deterministic synthetic and regression tests with:
+
+```sh
+python -m pytest -q
+```

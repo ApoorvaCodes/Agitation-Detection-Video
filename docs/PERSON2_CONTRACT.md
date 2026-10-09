@@ -201,6 +201,25 @@ Each event includes `behaviour`, `start_timestamp`, `end_timestamp`,
 Person 3 should use these as reviewable candidate evidence, not confirmed CMAI
 items, item frequencies, severity, or a total score.
 
+## Experimental Hitting motion-baseline source
+
+Person 2 retains its labeled prototype similarity path and also runs the explicitly
+experimental Hitting motion baseline on timestamped P1 normalized pose observations.
+This baseline does not require a prototype bank or contact annotations. It emits
+Experimental `cmai_01_pacing_aimless_wandering` and `cmai_29_general_restlessness`
+events use the same `motion_baseline` source marker and include a detector
+version, source observation IDs/timestamps, accepted features, and reasons.
+The optional per-track `movement_diagnostics` map records accepted-window
+features or abstention reasons. Hitting events retain `candidate_source:
+"motion_baseline"`, the actor's
+left/right arm, a bounded engineering score, P2 window IDs, and detailed source
+observation features. Prototype events retain `candidate_source: "prototype"`.
+Per-event source metadata disambiguates motion scores from prototype cosine
+similarity; neither is a calibrated probability. Thresholds are in
+`configs/hitting_motion.json` and documented in `CMAI_ACTIONS.md`. It is a
+research baseline and does not replace the prototype architecture or constitute
+clinical validation.
+
 ## Example prototype workflow
 
 Run without a bank to extract descriptors, then annotate selected chunks:

@@ -16,6 +16,15 @@ The schema remains `1.0`. Additions are optional; existing fields and meanings a
 
 Units are body-normalized-coordinate units, units/second, units/second², units/second³, bbox-normalized units, degrees/second, and degrees for underlying angles. `feature_values` uses these names; null means unavailable. `quality.feature_validity` gives a boolean for every name.
 
+OpenCV decodes BGR frames; the MediaPipe Pose adapter converts each detected
+person crop to RGB immediately before inference. Raw landmarks remain mapped
+from crop coordinates into full-frame normalized coordinates. `diagnostics`
+reports sampled frames, person detections, valid-pose/wrist/arm-chain frame
+counts, and is additive to schema 1.0. Landmarks below the configured
+visibility or presence threshold are omitted from `normalized_pose` and are
+not used by motion calculations; absent confidence values are not treated as
+zero confidence.
+
 ## Windows
 
 `video.window_feature_names` is authoritative. Windows are `[start_timestamp,end_timestamp]`, with configured duration (default 2 seconds) and step `duration * (1-overlap)` (default 50% overlap). `valid_fraction` is valid frames divided by frames in the window; `low_quality` is true below the configured default 0.60 threshold. Low-quality windows are retained.

@@ -7,7 +7,7 @@ from cmai.taxonomy import VERSION, load_taxonomy
 from person2.contracts import Contract, BehaviourScore
 from cmai.interactions import ContactObservation
 from cmai.action_detection import ActionEvidenceResult, LIMBS
-from cmai.taxonomy import ACTION_ITEMS
+from cmai.taxonomy import ACTION_ITEMS, MOVEMENT_BASELINE_ITEMS
 
 ReviewStatus = Literal["pending", "confirmed", "rejected", "uncertain"]
 
@@ -60,7 +60,7 @@ class CameraEvent(Contract):
     start_timestamp: float = Field(ge=0)
     end_timestamp: float = Field(gt=0)
     score: float = Field(ge=-1, le=1)
-    score_semantics: Literal["uncalibrated_cosine_similarity"] = "uncalibrated_cosine_similarity"
+    score_semantics: Literal["uncalibrated_cosine_similarity", "heuristic_motion_score"] = "uncalibrated_cosine_similarity"
     source_label: str
     source_candidate_id: str
     evidence: CandidateEvidence
@@ -151,6 +151,14 @@ class CameraResult(Contract):
         rules = {r.item_id for r in self.detector.rules}
         for a in self.availability:
             item = taxonomy.item(a.cmai_item_id)
+            if a.cmai_item_id in MOVEMENT_BASELINE_ITEMS:
+                if a.status != "research_only":
+                    raise ValueError("experimental movement baseline availability must be research-only")
+                continue
+            if a.cmai_item_id == "cmai_07_hitting" and a.cmai_item_id not in rules:
+                if a.status not in {"research_only", "unavailable"}:
+                    raise ValueError("Hitting baseline availability must be research-only or unavailable")
+                continue
             expected = ("not_assessed_by_camera" if item.camera_status in {"not_camera_only", "out_of_initial_scope"}
                         else "unavailable" if a.cmai_item_id not in rules else
                         "available" if self.detector.mode == "released" else "research_only")
@@ -163,7 +171,26 @@ class CameraResult(Contract):
             if len({c.chunk_id for c in track.intervals}) != len(track.intervals):
                 raise ValueError("duplicate chunk IDs in track coverage")
         for e in self.events:
-            if e.cmai_item_id in ACTION_ITEMS:
+            motion_baseline = (e.cmai_item_id in MOVEMENT_BASELINE_ITEMS or e.cmai_item_id == "cmai_07_hitting"
+                               and e.evidence_check.get("candidate_source") == "motion_baseline")
+            if e.cmai_item_id in MOVEMENT_BASELINE_ITEMS:
+                expected_detector = ("pacing_trajectory_v1" if e.cmai_item_id == "cmai_01_pacing_aimless_wandering"
+                                     else "restlessness_pose_motion_v1")
+                features = e.evidence_check.get("motion_features", {})
+                source_ids = features.get("source_observation_ids", []) if isinstance(features, dict) else []
+                timestamps = features.get("observation_timestamps", []) if isinstance(features, dict) else []
+                source_refs = {f"{e.evidence.person_id}:frame:{frame}" for frame in e.evidence.frame_indices}
+                if (e.evidence_check.get("candidate_source") != "motion_baseline"
+                        or features.get("detector") != expected_detector
+                        or not isinstance(source_ids, list) or len(source_ids) < 2
+                        or not isinstance(timestamps, list) or len(timestamps) < 2
+                        or not all(isinstance(oid, str) and oid for oid in source_ids)
+                        or not set(source_ids) <= source_refs
+                        or any(not isinstance(t, (int, float)) or not e.start_timestamp <= t <= e.end_timestamp for t in timestamps)
+                        or not features.get("acceptance_reasons")):
+                    raise ValueError("movement events require source-grounded experimental detector evidence")
+            optional_contact_hitting = e.cmai_item_id == "cmai_07_hitting"
+            if e.cmai_item_id in ACTION_ITEMS and not motion_baseline and not optional_contact_hitting:
                 contacts = e.evidence.contacts
                 supported = {c.evidence_id:c for a in self.action_assessments.assessments
                              if a.person_id == e.evidence.person_id and a.item_id == e.cmai_item_id
@@ -178,14 +205,14 @@ class CameraResult(Contract):
                     raise ValueError("action candidate requires visible, source-linked observed contact")
                 if len({(c.target_kind,c.target_id) for c in contacts}) != 1:
                     raise ValueError("action event cannot merge different targets")
-            if e.cmai_item_id not in rules:
+            if e.cmai_item_id not in rules and not motion_baseline:
                 raise ValueError("event item has no enabled detector")
             if e.evidence.video_id != self.video_id or e.evidence.person_id not in people:
                 raise ValueError("event evidence refers to another video/person")
             if not set(e.evidence.chunk_ids) <= set(people[e.evidence.person_id]):
                 raise ValueError("event evidence refers to unknown chunks")
             chunks = [people[e.evidence.person_id][cid] for cid in e.evidence.chunk_ids]
-            if any(c.status != "scored" for c in chunks):
+            if any(c.status != "scored" for c in chunks) and not motion_baseline:
                 raise ValueError("event cannot claim abstained chunks as supporting evidence")
             if len({c.segment_id for c in chunks}) != 1:
                 raise ValueError("event cannot bridge a track gap")

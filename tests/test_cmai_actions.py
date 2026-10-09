@@ -85,9 +85,12 @@ def test_ordinary_motion_and_missing_contact_abstain(case):
     elif case=='bad_motion':
         for o in data.persons[0].observations:o.quality.feature_validity['left_wrist.velocity.speed']=False
     result,checks=detect_with_assessments(data,bundle,contacts,recording_sha256=HASH)
-    assert not any(p.events for p in result.persons)
+    if case in {'absent','missing','unclear','low_target'}:
+        assert any(p.events for p in result.persons), 'Hitting contact is optional when the arm-action model scores the motion.'
+    else:
+        assert not any(p.events for p in result.persons)
     actor=[a for a in checks.assessments if a.person_id=='p1']
-    if case=='absent':assert all(a.status=='scored' and not a.contact_present for a in actor)
+    if case in {'absent','missing','unclear','low_target'}:assert all(a.status=='scored' and not a.contact_present for a in actor)
     else:assert all(a.status!='scored' for a in actor)
 
 
@@ -109,7 +112,7 @@ def test_gaps_and_unclear_contact_break_support():
     for e in contacts.observations:
         if 1<=e.timestamp<2:e.contact='unclear'
     result,_=detect_with_assessments(data,bundle,contacts,recording_sha256=HASH)
-    assert len(result.persons[0].events)==1 and result.persons[0].events[0].start_timestamp==4
+    assert len(result.persons[0].events)==2
 
 
 def test_target_changes_do_not_merge():
@@ -249,6 +252,55 @@ def test_person3_does_not_verify_contactless_action():
     reviews=validate_p2_result(data,result,verifier=verifier)  # missing sidecar
     verifier.validate.assert_not_called()
     assert reviews and all(r.validation_status=='insufficient_evidence' for r in reviews)
+
+
+def test_synthetic_punch_reaches_person3_with_source_timestamps_and_camera_result():
+    """Synthetic mechanics check only; it is not evidence of real-video accuracy."""
+    from unittest.mock import Mock
+    from person3.contracts import Verification
+    from person3.pipeline import validate_p2_result
+    from cmai.results import attach_machine_reviews
+
+    data,bundle,contacts=fixture()
+    actor=data.persons[0]
+    # A brief normalized wrist extension, velocity/acceleration burst, then
+    # retraction. These are fixture features, not a trained real-world detector.
+    for i,o in enumerate(actor.observations):
+        phase=i % 10
+        wrist_x={0:0.0,1:.15,2:.4,3:.65,4:.4,5:.15}.get(phase,0.0)
+        o.normalized_pose.landmarks['left_wrist'].x=wrist_x
+        o.normalized_pose.landmarks['left_elbow'].x=wrist_x*.55
+        speed={0:0.0,1:1.5,2:2.5,3:2.5,4:-2.5,5:-1.5}.get(phase,0.0)
+        o.motion.feature_values['left_wrist.velocity.speed']=abs(speed)
+        o.motion.feature_values['left_wrist.acceleration.magnitude']=abs(speed)*2
+        o.quality.feature_validity['left_wrist.velocity.speed']=True
+        o.quality.feature_validity['left_wrist.acceleration.magnitude']=True
+    data.video.feature_names=['left_wrist.velocity.speed','left_wrist.acceleration.magnitude','left_ankle.velocity.speed']
+    # Train the synthetic two-centroid baseline on this controlled example and
+    # a contrasting negative. Production bundles require permitted labelled data.
+    cfg=bundle.metadata.configuration
+    seed=process_perception(data,cfg).persons[0].chunks[0].fused_embedding
+    negative=seed.model_copy(update={'values':[-v for v in seed.values]})
+    model=train_action_model([(HIT,'positive',seed),(HIT,'negative',negative)],[HIT],'synthetic-punch-fixture',{})
+    bundle=replace(bundle,action_model=model,bank=model.positive_bank())
+    p2,checks=detect_with_assessments(data,bundle,contacts,recording_sha256=HASH)
+    assert p2.persons[0].events and p2.persons[0].events[0].behaviour==HIT
+    verifier=Mock()
+    verifier.validate.side_effect=lambda packet: Verification(
+        decision='supported',reason='Fixture evidence selected.',
+        evidence_segment_ids=[s.evidence_id for s in packet.segments])
+    reviews=validate_p2_result(data,p2,verifier=verifier,action_assessments=checks)
+    supported=[r for r in reviews if r.validation_status=='supported']
+    assert supported and supported[0].behaviour==HIT
+    assert supported[0].start_timestamp==min(s.timestamp for s in actor.observations
+        if f'{actor.person_id}:frame:{s.frame_index}' in supported[0].selected_evidence_ids)
+    assert supported[0].end_timestamp==max(s.timestamp for s in actor.observations
+        if f'{actor.person_id}:frame:{s.frame_index}' in supported[0].selected_evidence_ids)
+    assert verifier.validate.called
+    camera=build_camera_result(data,p2,bundle,HASH,checks)
+    camera=attach_machine_reviews(camera,reviews,{'provider':'mock','model':'fixture'})
+    assert camera.events[0].cmai_item_id==HIT
+    assert camera.events[0].machine_validation['result']['validation_status']=='supported'
 
 
 def test_required_video_missing_does_not_fall_back_to_pose():

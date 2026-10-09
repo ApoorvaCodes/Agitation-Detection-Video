@@ -8,8 +8,9 @@ import math
 
 from cmai.contracts import (CameraEvent, CameraResult, CandidateEvidence, CandidateQuality,
                             CoverageInterval, ItemAvailability, ReviewDecision, TrackCoverage)
-from cmai.taxonomy import canonical_item, load_taxonomy
+from cmai.taxonomy import canonical_item, load_taxonomy, MOVEMENT_BASELINE_ITEMS
 from person2.embeddings import encoder_metadata
+from person2.hitting import HittingConfig
 
 
 def build_camera_result(p1, p2, bundle, source_sha256=None, action_assessments=None):
@@ -19,12 +20,16 @@ def build_camera_result(p1, p2, bundle, source_sha256=None, action_assessments=N
     if p1.video.video_id != p2.video_id:
         raise ValueError("P1/P2 must refer to the same recording")
     rules = {r.item_id for r in bundle.metadata.rules}
+    hitting_baseline = HittingConfig.load().enabled
     availability = []
     for item in taxonomy.items:
         status = ("not_assessed_by_camera" if item.camera_status in {"not_camera_only", "out_of_initial_scope"}
+                  else "research_only" if item.item_id in MOVEMENT_BASELINE_ITEMS or item.item_id == "cmai_07_hitting" and hitting_baseline and item.item_id not in rules
                   else "unavailable" if item.item_id not in rules else
                   "available" if bundle.metadata.mode == "released" else "research_only")
-        reason = ("Needs audio or context outside the initial camera scope." if status == "not_assessed_by_camera"
+        reason = ("Experimental trajectory/pose-motion baseline; thresholds are engineering defaults and require labeled-data evaluation." if item.item_id in MOVEMENT_BASELINE_ITEMS
+                  else "Experimental body-relative arm-motion baseline; engineering thresholds require labeled-data calibration." if item.item_id == "cmai_07_hitting" and hitting_baseline
+                  else "Needs audio or context outside the initial camera scope." if status == "not_assessed_by_camera"
                   else "No evaluated detector asset is configured for this item." if status == "unavailable"
                   else "Custom labelled prototypes: research candidates, empirical validation pending." if status == "research_only"
                   else "Evaluated asset with recorded release approval; flags still require review.")
@@ -49,7 +54,7 @@ def build_camera_result(p1, p2, bundle, source_sha256=None, action_assessments=N
             selected = [chunks[cid] for cid in event.chunk_ids]
             frames = {f for c in selected for f in c.frame_indices}
             rows = [o for o in observations if o.frame_index in frames
-                    and event.start_timestamp <= o.timestamp < event.end_timestamp]
+                    and event.start_timestamp <= o.timestamp <= event.end_timestamp]
             if not rows:
                 raise ValueError("candidate lacks timestamped source evidence")
             event_key = f"{p1.video.video_id}:{person.person_id}:{item_id}:{event.start_timestamp}:{event.end_timestamp}"
@@ -62,16 +67,25 @@ def build_camera_result(p1, p2, bundle, source_sha256=None, action_assessments=N
                             and a.chunk_id in event.chunk_ids and a.item_id == item_id and a.status == "scored"
                             for c in a.contacts if c.contact == "observed" and event.start_timestamp <= c.timestamp < event.end_timestamp}
                 contacts = sorted(contacts.values(),key=lambda c:(c.timestamp,c.evidence_id))
+            motion_baseline = (event.candidate_source == "motion_baseline"
+                               or bool(event.evidence.get("motion_baseline")))
+            motion_details = event.evidence.get("motion_baseline", event.evidence) if motion_baseline else {}
+            score = event.candidate_score if event.candidate_score is not None else event.peak_similarity
             events.append(CameraEvent(event_id=sha256(event_key.encode()).hexdigest()[:24],
                           cmai_item_id=item_id, source_label=event.behaviour,
                           source_candidate_id=candidate_id,
                           start_timestamp=event.start_timestamp, end_timestamp=event.end_timestamp,
-                          score=event.peak_similarity,
+                          score=score,
+                          score_semantics="heuristic_motion_score" if motion_baseline else "uncalibrated_cosine_similarity",
                           evidence=CandidateEvidence(video_id=p1.video.video_id, person_id=person.person_id,
                                     chunk_ids=event.chunk_ids, frame_indices=sorted({o.frame_index for o in rows}), contacts=contacts),
                           quality=CandidateQuality(min_valid_fraction=min(c.valid_fraction for c in selected)),
                           evidence_check={"status": "reviewable" if reviewable else "insufficient_evidence",
-                                          "quality_flags": flags, "source_evidence_ids": [s.evidence_id for s in packet.segments]}))
+                                          "quality_flags": flags, "source_evidence_ids": [s.evidence_id for s in packet.segments],
+                                          "candidate_source": "motion_baseline" if motion_baseline else event.candidate_source,
+                                          "candidate_score": score,
+                                          "arm_side": event.arm_side or motion_details.get("arm_side"),
+                                          "motion_features": motion_details}))
     encoders = encoder_metadata(p2, bundle.pose_encoder())
     root = Path(__file__).resolve().parents[1]
     encoders["candidate_pipeline"] = {"model": bundle.action_model.model_identity if bundle.action_model else "cmai_masked_prototype_rules",
@@ -97,7 +111,9 @@ def build_camera_result(p1, p2, bundle, source_sha256=None, action_assessments=N
                                      "No event is not a confirmed negative. Gaps and abstentions remain unknown.",
                                      "Occlusion is not measured by the current P1 contract; visibility and occlusion remain unknown.",
                                      "Session-local track IDs are not verified identities; track swaps remain possible.",
-                                     "No evaluated behaviour detector is shipped; a release needs labelled data and approval."])
+                                     "Hitting's pose/motion baseline is experimental and not clinically validated; thresholds need calibration on labeled data.",
+                                     "Pacing and Restlessness motion thresholds are experimental engineering defaults, not clinically validated.",
+                                     "No released behaviour detector is shipped; release needs labeled data and approval."])
 
 
 def review_event(result, event_id, decision, reviewer, note=""):

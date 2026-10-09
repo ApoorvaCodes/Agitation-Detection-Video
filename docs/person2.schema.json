@@ -29,6 +29,50 @@
           },
           "title": "Chunk Ids",
           "type": "array"
+        },
+        "candidate_source": {
+          "default": "prototype",
+          "enum": [
+            "prototype",
+            "motion_baseline"
+          ],
+          "title": "Candidate Source",
+          "type": "string"
+        },
+        "arm_side": {
+          "anyOf": [
+            {
+              "enum": [
+                "left",
+                "right"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Arm Side"
+        },
+        "candidate_score": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidate Score"
+        },
+        "evidence": {
+          "additionalProperties": true,
+          "title": "Evidence",
+          "type": "object"
         }
       },
       "required": [
@@ -303,6 +347,11 @@
           },
           "title": "Events",
           "type": "array"
+        },
+        "movement_diagnostics": {
+          "additionalProperties": true,
+          "title": "Movement Diagnostics",
+          "type": "object"
         }
       },
       "required": [

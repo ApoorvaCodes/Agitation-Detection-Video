@@ -16,6 +16,15 @@ def test_enrichment_uses_irregular_time_and_resets_gap():
     assert observations[1].motion.feature_values["left_wrist.velocity.speed"] == 1
     assert observations[2].motion.feature_values["left_wrist.velocity.speed"] is None
     assert observations[3].motion.feature_values["left_wrist.velocity.speed"] is not None
+
+def test_enrichment_does_not_bridge_a_missing_landmark():
+    observations=[_obs(0,0),_obs(.1,1,False),_obs(.2,2)]
+    # Keep the pose but remove only the wrist in the middle sample.
+    observations[1].normalized_pose=PoseData(landmarks={"left_hip":Landmark(x=1,y=0),"right_hip":Landmark(x=2,y=0)})
+    observations[1].quality.pose_detected=True
+    enrich_observations(observations,1,.001)
+    values=[o.motion.feature_values["left_wrist.velocity.speed"] for o in observations]
+    assert values[0] is None and values[1] is None and values[2] is None
 def test_jerk_and_angular_velocity_are_validity_aware():
     observations=[_obs(0,0),_obs(1,1),_obs(2,3),_obs(3,6)]
     enrich_observations(observations,2,.001)

@@ -1,5 +1,5 @@
 """Versioned research evidence handoff; scores are not clinical probabilities."""
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -56,11 +56,37 @@ class BehaviourEvent(Contract):
     end_timestamp: float = Field(ge=0)
     peak_similarity: float = Field(ge=-1, le=1)
     chunk_ids: list[str]
+    candidate_source: Literal["prototype", "motion_baseline"] = "prototype"
+    arm_side: Literal["left", "right"] | None = None
+    candidate_score: float | None = Field(default=None, ge=0, le=1)
+    evidence: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def check_interval(self):
         if self.end_timestamp <= self.start_timestamp or not self.chunk_ids:
             raise ValueError("event must have positive duration and supporting chunk IDs")
+        if self.candidate_source == "motion_baseline":
+            allowed = {"cmai_07_hitting", "cmai_01_pacing_aimless_wandering", "cmai_29_general_restlessness"}
+            if self.behaviour not in allowed or self.candidate_score is None:
+                raise ValueError("motion-baseline event requires an enabled experimental behaviour and score")
+            if self.behaviour == "cmai_07_hitting" and not self.arm_side:
+                raise ValueError("Hitting motion-baseline events require an arm side")
+            movement_detectors = {
+                "cmai_01_pacing_aimless_wandering": "pacing_trajectory_v1",
+                "cmai_29_general_restlessness": "restlessness_pose_motion_v1",
+            }
+            if self.behaviour in movement_detectors:
+                evidence = self.evidence
+                ids, timestamps = evidence.get("source_observation_ids"), evidence.get("observation_timestamps")
+                if (evidence.get("detector") != movement_detectors[self.behaviour]
+                        or not isinstance(ids, list) or len(ids) < 2
+                        or not isinstance(timestamps, list) or len(timestamps) != len(ids)
+                        or not evidence.get("acceptance_reasons")):
+                    raise ValueError("movement baseline events require versioned, timestamped accepted source evidence")
+                if (not all(isinstance(oid, str) and oid for oid in ids) or len(ids) != len(set(ids))
+                        or any(not isinstance(t, (int, float)) or not self.start_timestamp <= t <= self.end_timestamp for t in timestamps)
+                        or any(b <= a for a, b in zip(timestamps, timestamps[1:]))):
+                    raise ValueError("movement source IDs and timestamps must be unique, ordered and inside the event interval")
         return self
 
 
@@ -68,6 +94,7 @@ class PersonResult(Contract):
     person_id: str
     chunks: list[ChunkResult]
     events: list[BehaviourEvent]
+    movement_diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
 class Person2VideoResult(Contract):

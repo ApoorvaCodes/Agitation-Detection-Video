@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 INITIAL_ITEMS = {"cmai_01_pacing_aimless_wandering", "cmai_26_repetitious_mannerisms",
                  "cmai_29_general_restlessness"}
 ACTION_ITEMS = {"cmai_07_hitting", "cmai_08_kicking"}
+MOVEMENT_BASELINE_ITEMS = {"cmai_01_pacing_aimless_wandering", "cmai_29_general_restlessness"}
 LEGACY_LABELS = {item.removeprefix("cmai_").split("_", 1)[1]: item for item in INITIAL_ITEMS}
 
 

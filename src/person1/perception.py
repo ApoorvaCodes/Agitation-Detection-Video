@@ -1,11 +1,24 @@
 from dataclasses import dataclass
 from typing import Any, Protocol
+import cv2
 import importlib.metadata
 import importlib.util
 import sys
 from person1.errors import DetectionError, ModelLoadError, PoseEstimationError
 
 MEDIAPIPE_LANDMARK_NAMES = ["nose", "left_eye_inner", "left_eye", "left_eye_outer", "right_eye_inner", "right_eye", "right_eye_outer", "left_ear", "right_ear", "mouth_left", "mouth_right", "left_shoulder", "right_shoulder", "left_elbow", "right_elbow", "left_wrist", "right_wrist", "left_pinky", "right_pinky", "left_index", "right_index", "left_thumb", "right_thumb", "left_hip", "right_hip", "left_knee", "right_knee", "left_ankle", "right_ankle", "left_heel", "right_heel", "left_foot_index", "right_foot_index"]
+
+def _optional_confidence(landmark, name):
+    """Keep unset protobuf confidence fields missing instead of reading 0.0."""
+    has_field = getattr(landmark, "HasField", None)
+    if callable(has_field):
+        try:
+            if not has_field(name):
+                return None
+        except (ValueError, TypeError):
+            pass
+    value = getattr(landmark, name, None)
+    return float(value) if value is not None else None
 
 @dataclass(frozen=True)
 class Detection:
@@ -78,7 +91,11 @@ class MediaPipePoseEstimator:
         except Exception as exc: raise ModelLoadError(f"Could not initialize MediaPipe Pose: {exc}") from exc
     def estimate(self, crop: Any) -> PoseResult | None:
         try:
-            result = self.pose.process(crop)
+            # VideoLoader and YOLO operate on OpenCV BGR frames; MediaPipe
+            # Pose expects RGB input. Convert at this adapter boundary so all
+            # callers (including crop-based inference) use the right order.
+            rgb_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+            result = self.pose.process(rgb_crop)
             if not result.pose_landmarks: return None
-            return PoseResult({self.names[i] if i < len(self.names) else f"landmark_{i}": {"x": float(p.x), "y": float(p.y), "z": float(p.z), "visibility": float(getattr(p, "visibility", 0)), "presence": float(getattr(p, "presence", 0))} for i,p in enumerate(result.pose_landmarks.landmark)})
+            return PoseResult({self.names[i] if i < len(self.names) else f"landmark_{i}": {"x": float(p.x), "y": float(p.y), "z": float(p.z), "visibility": _optional_confidence(p,"visibility"), "presence": _optional_confidence(p,"presence")} for i,p in enumerate(result.pose_landmarks.landmark)})
         except Exception as exc: raise PoseEstimationError(f"MediaPipe pose inference failed: {exc}") from exc

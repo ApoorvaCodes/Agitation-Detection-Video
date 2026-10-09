@@ -28,6 +28,17 @@ def build_evidence_packet(candidate: CandidateBehaviour, person) -> EvidencePack
                     pose[name] = {"x": point.x, "y": point.y, "z": point.z}
         quality = o.quality.model_dump(mode="json", exclude_none=True)
         quality["contact_evidence"] = [e for e in candidate.evidence.get("contacts", []) if e["frame_index"] == o.frame_index]
+        quality["candidate_source"] = ("motion_baseline" if candidate.evidence.get("motion_baseline")
+                                        else candidate.evidence.get("candidate_source", "prototype"))
+        movement = candidate.evidence.get("motion_baseline", {})
+        if isinstance(movement, dict) and movement.get("detector") in {"pacing_trajectory_v1", "restlessness_pose_motion_v1"}:
+            quality["movement_pattern"] = movement
+        if candidate.evidence.get("arm_side"):
+            quality["arm_side"] = candidate.evidence["arm_side"]
+        hitting_row = next((item for item in candidate.evidence.get("motion_baseline", {}).get("observation_features", [])
+                            if item.get("frame_index") == o.frame_index), None)
+        if hitting_row:
+            quality["hitting_features"] = hitting_row
         rows.append(EvidenceSegment(evidence_id=oid, timestamp=o.timestamp, frame_index=o.frame_index,
                                     motion_features=relevant, pose=pose, quality_flags=quality))
     # Remote verification receives the strict camera taxonomy ID.  Legacy P2
@@ -65,10 +76,12 @@ def candidates_from_p2(p2_result, p1_result, action_assessments=None) -> list[Ca
                          if s.behaviour == event.behaviour and s.smoothed_similarity is not None), default=event.peak_similarity)
             candidate = CandidateBehaviour(
                 candidate_id=f"{p2_person.person_id}:{event.behaviour}:{index:04d}", person_id=p2_person.person_id,
-                behaviour=event.behaviour, candidate_score=score, start_timestamp=event.start_timestamp,
+                behaviour=event.behaviour, candidate_score=event.candidate_score if event.candidate_score is not None else score, start_timestamp=event.start_timestamp,
                 end_timestamp=event.end_timestamp, source_window_ids=list(event.chunk_ids),
                 source_observation_ids=[observation_id(p2_person.person_id, o.frame_index) for o in rows],
-                evidence={"p2_peak_similarity": event.peak_similarity},
+                evidence={"p2_peak_similarity": event.peak_similarity,
+                          "candidate_source": event.candidate_source,"arm_side": event.arm_side,
+                          "motion_baseline": event.evidence.get("motion_baseline",event.evidence)},
             )
             if action_assessments is not None:
                 contacts = {e.evidence_id:e.model_dump(mode="json") for a in action_assessments.assessments

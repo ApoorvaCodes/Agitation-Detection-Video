@@ -23,6 +23,8 @@ from person3.qwen_validator import GroqQwenValidator
 from person3.supabase_store import SupabaseStore
 from cmai.bundle import load_bundle, research_override, legacy_result_bundle
 from cmai.taxonomy import load_taxonomy
+from cmai.taxonomy import ACTION_ITEMS, MOVEMENT_BASELINE_ITEMS
+from person2.hitting import HittingConfig
 from cmai.results import (build_camera_result, review_event, create_evidence, export_archive, attach_machine_reviews)
 from cmai.jobs import start_analysis
 from cmai.interactions import InteractionEvidence
@@ -50,11 +52,26 @@ def render_camera_result(p1, p2, bundle):
             st.json(result.action_assessments.model_dump(mode="json"))
     taxonomy = load_taxonomy()
     names = {i.item_id: i.display_name for i in taxonomy.items}
-    st.subheader("CMAI camera coverage")
-    st.caption("This recording is the evidence window. No two-week caregiver frequency rating is inferred. Absence of a flag is not a confirmed negative.")
-    st.dataframe([{"CMAI item": a.cmai_item_id, "Behaviour": names[a.cmai_item_id],
-                   "Assessment": a.status.replace("_", " "), "Reason": a.reason}
-                  for a in result.availability], use_container_width=True)
+    names.update({"cmai_01_pacing_aimless_wandering": "Pacing / Aimless Wandering",
+                  "cmai_29_general_restlessness": "Restlessness"})
+    enabled = ACTION_ITEMS & {rule.item_id for rule in bundle.metadata.rules}
+    hitting_enabled = HittingConfig.load().enabled
+    st.subheader("Detected physical behaviours")
+    st.caption("This recording is the evidence window. Scores are candidate similarities, not probabilities or clinical ratings.")
+    active_behaviours = ACTION_ITEMS | MOVEMENT_BASELINE_ITEMS
+    camera_rows = [a for a in result.availability if a.cmai_item_id in active_behaviours]
+    st.dataframe([{"Behaviour": names[a.cmai_item_id],
+                   "Detector": "research only" if a.status == "research_only" else a.status.replace("_", " "),
+                   "Details": a.reason}
+                  for a in camera_rows], use_container_width=True)
+    if "cmai_07_hitting" not in enabled and not hitting_enabled:
+        st.info("The Hitting motion baseline is disabled. Enable it in configs/hitting_motion.json.")
+    with st.expander("Not currently assessable from video"):
+        st.caption("Hitting uses an experimental arm-motion baseline; Pacing uses repeated track trajectories; Restlessness uses repeated pose motion when locomotion is not the dominant pattern. Kicking requires a labeled action model and target/contact evidence. Audio and context behaviours are outside this video dashboard.")
+        unsupported = [i.display_name for i in taxonomy.items
+                       if i.camera_status not in {"not_camera_only", "out_of_initial_scope"}
+                       and i.item_id not in active_behaviours]
+        st.write(", ".join(unsupported))
     people = [p.person_id for p in p1.persons]
     options = [None, *people] if len(people) != 1 else people
     selected_person = st.selectbox("Person / session track to review", options,
@@ -62,10 +79,70 @@ def render_camera_result(p1, p2, bundle):
     if len(people) > 1 and selected_person is None:
         st.info("Choose a person track before reviewing candidates. Tracks are never combined.")
     if selected_person is not None:
+        track_p2 = next((p for p in p2.persons if p.person_id == selected_person), None)
+        if track_p2:
+            with st.expander("Pacing and Restlessness diagnostics"):
+                st.caption("These experimental camera movement-pattern candidates are not clinical conclusions. Missing pose or track coverage is reported as abstention evidence.")
+                st.json(track_p2.movement_diagnostics)
+            with st.expander("Hitting motion debug", expanded=not any(e.behaviour == "cmai_07_hitting" for e in track_p2.events)):
+                features = [chunk.motion_features for chunk in track_p2.chunks]
+                def maximum(key):
+                    values = [row.get(key) for row in features if row.get(key) is not None]
+                    return max(values) if values else None
+                st.caption("Body-relative motion values use source timestamps. Candidate score is not a calibrated probability.")
+                st.json({
+                    "Total frames processed": maximum("hitting.total_frames_processed"),
+                    "Total frames in source video": maximum("hitting.total_source_video_frames"),
+                    "Frames with YOLO person detection (selected track)": maximum("hitting.frames_with_yolo_person_detection"),
+                    "Person detections": maximum("hitting.p1_person_detections"),
+                    "Frames with valid MediaPipe pose": maximum("hitting.frames_with_valid_mediapipe_pose"),
+                    "Frames with valid left wrist": maximum("hitting.frames_with_valid_left_wrist"),
+                    "Frames with valid right wrist": maximum("hitting.frames_with_valid_right_wrist"),
+                    "Frames with valid left shoulder/elbow/wrist": maximum("hitting.frames_with_valid_left_arm_chain"),
+                    "Frames with valid right shoulder/elbow/wrist": maximum("hitting.frames_with_valid_right_arm_chain"),
+                    "Motion observations": maximum("hitting.motion_observations"),
+                    "Max left wrist displacement": maximum("hitting.max_left_wrist_displacement"),
+                    "Max right wrist displacement": maximum("hitting.max_right_wrist_displacement"),
+                    "Max left wrist velocity": maximum("hitting.max_left_wrist_velocity"),
+                    "Max right wrist velocity": maximum("hitting.max_right_wrist_velocity"),
+                    "Max left acceleration": maximum("hitting.max_left_acceleration"),
+                    "Max right acceleration": maximum("hitting.max_right_acceleration"),
+                    "Max extension change": maximum("hitting.max_extension_change"),
+                    "First/last left wrist (body-relative x/y/z)": {
+                        edge: {axis: maximum(f"hitting.{edge}_left_wrist_{axis}") for axis in ("x","y","z")}
+                        for edge in ("first","last")},
+                    "First/last right wrist (body-relative x/y/z)": {
+                        edge: {axis: maximum(f"hitting.{edge}_right_wrist_{axis}") for axis in ("x","y","z")}
+                        for edge in ("first","last")},
+                })
+                motion_candidates = [e for e in track_p2.events if e.behaviour == "cmai_07_hitting"]
+                if not motion_candidates:
+                    st.info("No Hitting candidate generated.")
+                else:
+                    debug_rows = []
+                    for candidate in motion_candidates:
+                        details = candidate.evidence.get("motion_baseline", candidate.evidence)
+                        st.write({"Behaviour": "Hitting", "Person": track_p2.person_id,
+                                  "Start": candidate.start_timestamp, "End": candidate.end_timestamp,
+                                  "Candidate score": candidate.candidate_score,
+                                  "Arm": candidate.arm_side or details.get("arm_side"),
+                                  "Source": candidate.candidate_source,
+                                  "Validation": "reviewable candidate; Qwen is optional"})
+                        debug_rows.extend({"timestamp": row.get("timestamp"),
+                            "wrist speed": row.get("wrist_velocity"),
+                            "wrist acceleration": row.get("wrist_acceleration"),
+                            "arm extension": row.get("arm_extension"),
+                            "extension change": row.get("extension_change"),
+                            "candidate score": candidate.candidate_score,
+                            "arm side": candidate.arm_side or details.get("arm_side")}
+                            for row in details.get("observation_features", []))
+                    if debug_rows:
+                        st.dataframe(debug_rows, use_container_width=True)
         coverage = next(c for c in result.coverage if c.person_id == selected_person)
         with st.expander("Track coverage and abstentions"):
             st.json(coverage.model_dump(mode="json"))
-        candidates = [e for e in result.events if e.evidence.person_id == selected_person]
+        candidates = [e for e in result.events if e.evidence.person_id == selected_person
+                      and e.cmai_item_id in active_behaviours]
         if candidates:
             import plotly.graph_objects as go
             chart = go.Figure()
@@ -74,6 +151,7 @@ def render_camera_result(p1, p2, bundle):
                               x=[e.end_timestamp-e.start_timestamp], base=[e.start_timestamp],
                               orientation="h", text=[e.status], hovertext=[e.event_id])
             chart.update_layout(barmode="overlay", xaxis_title="Source time (seconds)")
+            st.subheader("Behaviour timeline")
             st.plotly_chart(chart, use_container_width=True)
             selected = st.selectbox("Select candidate", candidates,
                 format_func=lambda e: f"{names[e.cmai_item_id]} · {e.start_timestamp:.1f}–{e.end_timestamp:.1f} s · {e.status}")
@@ -83,6 +161,7 @@ def render_camera_result(p1, p2, bundle):
                     source_path = None
             if source_path:
                 # Selecting an interval seeks the source player to its evidence.
+                st.subheader("Selected event evidence")
                 st.video(source_path, start_time=selected.start_timestamp)
                 person = next(p for p in p1.persons if p.person_id == selected_person)
                 reference = candidate_reference_frame(source_path, selected, person)
@@ -94,6 +173,7 @@ def render_camera_result(p1, p2, bundle):
                     st.session_state.camera_result = result
                     selected = next(e for e in result.events if e.event_id == selected.event_id)
                 if selected.evidence.clip_status == "available":
+                    st.subheader("Evidence video clip")
                     clip = evidence_dir / Path(selected.evidence.clip_path).name
                     st.video(str(clip))
                     st.download_button("Download evidence clip", clip.read_bytes(), clip.name, "video/mp4")
@@ -101,6 +181,14 @@ def render_camera_result(p1, p2, bundle):
                     st.warning("A clip could not be decoded; review the source at the candidate timestamp.")
             else:
                 st.info("Upload the matching source video to inspect frames and create evidence clips.")
+            validation = (selected.machine_validation or {}).get("result", {}).get("validation_status", "not run")
+            st.write({"Behaviour": names[selected.cmai_item_id], "Person": selected.evidence.person_id,
+                      "Start": selected.start_timestamp, "End": selected.end_timestamp,
+                      "Candidate score": selected.evidence_check.get("candidate_score", selected.score),
+                      "Score note": "Not a calibrated probability.",
+                      "Arm": selected.evidence_check.get("arm_side"),
+                      "Validation": validation if validation != "not run" else selected.evidence_check.get("status", "unknown")})
+            st.subheader("Model and evidence details")
             st.json(selected.model_dump(mode="json"))
             with st.form("review_candidate"):
                 reviewer = st.text_input("Reviewer", value="local-reviewer")
@@ -147,12 +235,13 @@ def poll_analysis():
 
 
 def main():
-    st.set_page_config(page_title="Video behaviour review", layout="wide")
-    st.title("Video behaviour review")
-    st.caption("Upload a video to analyse movement and review behaviour candidates. Research use; not a diagnosis.")
+    st.set_page_config(page_title="Camera-based physical behaviour analysis", layout="wide")
+    st.title("Camera-based physical behaviour analysis")
+    st.caption("Current scope: video/pose/motion-based CMAI physical behaviours only. Research use; not a diagnosis.")
     try:
         default_bundle = load_bundle(os.getenv("CMAI_DETECTOR_BUNDLE") or None)
         load_taxonomy()
+        hitting_config = HittingConfig.load()
     except (ValueError, OSError) as exc:
         st.error(f"Detector/taxonomy configuration error: {exc}")
         return
@@ -171,7 +260,8 @@ def main():
         else:
             st.info("Enter your Groq API key to enable verification. Local video analysis works without it.")
         st.caption("Verify with Groq sends selected pose/motion evidence to Groq, not the raw video.")
-        st.caption(f"Detector: {default_bundle.metadata.detector_id} / {default_bundle.metadata.version} · {default_bundle.metadata.mode}")
+        st.caption(f"Active Hitting detector: pose/motion engineering baseline · {'enabled' if hitting_config.enabled else 'disabled'}")
+        st.caption(f"Additional action bundle: {default_bundle.metadata.detector_id} / {default_bundle.metadata.version} · {default_bundle.metadata.mode}")
 
     verifier_fingerprint = sha256((api_key + "\0" + model).encode()).hexdigest()
     if st.session_state.get("verifier_fingerprint") != verifier_fingerprint:
@@ -188,7 +278,7 @@ def main():
     interaction_file = None
     if default_bundle.metadata.detector_mode == "interaction_actions":
         with st.expander("Target/contact evidence (research)"):
-            st.caption("Hitting/kicking require independently reviewed or externally detected target/contact evidence. Proximity is insufficient; missing evidence causes abstention.")
+            st.caption("Contact annotations are optional supporting evidence for Hitting. Kicking's existing supervised action path retains its configured contact gate.")
             interaction_file = st.file_uploader("Interaction evidence JSON", type="json", key="interaction_evidence")
     if mode == "Video":
         with st.expander("Behaviour references (optional)"):
@@ -208,6 +298,7 @@ def main():
         st.session_state["input_fingerprint"] = fingerprint
 
     if video_file is not None:
+        st.subheader("Video preview")
         st.video(video_file.getvalue())
         if "source_path" not in st.session_state:
             directory = TemporaryDirectory(prefix="behaviour-review-")
@@ -261,6 +352,7 @@ def main():
     if "p1" not in st.session_state or "p2" not in st.session_state:
         return
     p1, p2 = st.session_state.p1, st.session_state.p2
+    st.subheader("Camera analysis status")
     candidate_count = sum(len(p.events) for p in p2.persons)
     if st.session_state.get("analysis_message"):
         st.success(st.session_state.pop("analysis_message"))
@@ -269,14 +361,20 @@ def main():
         st.download_button("Download perception results", p1.model_dump_json(indent=2), "perception.json", "application/json")
         st.download_button("Download candidate results", p2.model_dump_json(indent=2), "candidates.json", "application/json")
         if not st.session_state.active_bundle.metadata.rules:
-            st.info("Movement analysis is ready. No evaluated behaviour models are configured; no labels were generated.")
+            st.info("No prototype/action-model rules are configured. Experimental Hitting, Pacing and Restlessness motion baselines run independently of trained prototypes and are not calibrated.")
     selected_person = render_camera_result(p1, p2, st.session_state.active_bundle)
-    selected_count = sum(len(p.events) for p in p2.persons if p.person_id == selected_person)
+    selected_count = sum(sum(event.behaviour in ACTION_ITEMS or
+                             event.behaviour in {"hitting", "kicking"}
+                             for event in person.events)
+                         for person in p2.persons if person.person_id == selected_person)
     if st.button("Verify candidates with Groq", disabled=not api_key or not model.strip() or selected_count == 0):
         with st.spinner("Verifying candidate evidence with Groq…"):
             verifier = GroqQwenValidator(api_key=api_key, model=model.strip())
             selected_p2 = p2.model_copy(deep=True)
             selected_p2.persons = [p for p in selected_p2.persons if p.person_id == selected_person]
+            for person in selected_p2.persons:
+                person.events = [event for event in person.events
+                                 if event.behaviour in ACTION_ITEMS or event.behaviour in {"hitting", "kicking"}]
             events = validate_p2_result(p1, selected_p2, verifier=verifier,
                                         action_assessments=st.session_state.get("action_assessments"))
             st.session_state.events = [e.model_dump(mode="json") for e in events]

@@ -24,5 +24,5 @@ class TrackedPerson(ContractModel):
 class VideoMetadata(ContractModel):
     video_id: str; source_path: str; duration_seconds: float | None = None; fps: float; width: int; height: int; frame_count: int | None = None; codec: str | None = None; channels: int | None = None; processed_fps: float | None = None; detector_model: str | None = None; tracker_type: str | None = None; configuration_version: str = "1"; configuration: dict[str, Any] = Field(default_factory=dict); landmark_schema: list[str] = Field(default_factory=list); feature_names: list[str] = Field(default_factory=list); window_feature_names: list[str] = Field(default_factory=list)
 class Person1VideoResult(ContractModel):
-    schema_version: str = "1.0"; video: VideoMetadata; persons: list[TrackedPerson] = Field(default_factory=list)
+    schema_version: str = "1.0"; video: VideoMetadata; persons: list[TrackedPerson] = Field(default_factory=list); diagnostics: dict[str, Any] = Field(default_factory=dict)
     def to_json_dict(self) -> dict[str, Any]: return self.model_dump(mode="json", exclude_none=False)

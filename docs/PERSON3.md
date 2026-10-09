@@ -10,7 +10,7 @@ The adapter consumes the existing Person 2 `Person2VideoResult` schema 1.0 witho
 
 The current checkout contains both P1 and P2. The video dashboard runs them in sequence. The dashboard validates advanced uploads against the complete `Person2VideoResult`; `person3.p2_adapter.read_p2_handoff` remains available as the legacy field projection; `person3.evidence.candidates_from_p2` also accepts the P2 Python result object. Advanced uploads must have matching video IDs. P1 observations are identified deterministically as `{person_id}:frame:{frame_index}`. Person IDs are session-local tracker IDs and must not be interpreted as real identities.
 
-The versioned `CandidateBehaviour` adapter preserves candidate ID, person ID, label, score, interval, P2 source-window IDs, P1 observation IDs and additional evidence. It rejects unknown fields, nonfinite scores, invalid score bounds and nonpositive intervals.
+The versioned `CandidateBehaviour` adapter preserves candidate ID, person ID, label, score, interval, P2 source-window IDs, P1 observation IDs and additional evidence. P2 event metadata identifies `prototype` versus `motion_baseline` candidates and preserves arm side and per-observation Hitting measurements. It rejects unknown fields, nonfinite scores, invalid score bounds and nonpositive intervals.
 
 ## Taxonomy and mapping
 
@@ -18,9 +18,9 @@ The versioned `CandidateBehaviour` adapter preserves candidate ID, person ID, la
 
 ## Compact evidence construction
 
-`person3.evidence` selects P1 observations referenced by the source P2 chunks. Each evidence segment carries its deterministic source ID, original timestamp/frame index, selected body-normalized landmarks, motion feature values relevant to speed, acceleration, displacement and jerk, and P1 quality flags. The packet also retains person/candidate IDs, behaviour, score, candidate interval and source window IDs. It does not send raw video or all of the P1 JSON to Qwen.
+`person3.evidence` selects P1 observations referenced by the source P2 chunks. Each evidence segment carries its deterministic source ID, original timestamp/frame index, selected body-normalized landmarks, motion feature values relevant to speed, acceleration, displacement and jerk, and P1 quality flags. Experimental Hitting motion-baseline rows also include arm side, wrist speed/acceleration, body-relative arm extension and extension change. Contact is not required for this path. The packet also retains person/candidate IDs, behaviour, score, candidate interval and source window IDs. It does not send raw video or all of the P1 JSON to Qwen.
 
-The deterministic CMAI-aware gate currently requires a recognized taxonomy label, at least two source observations with strictly increasing times, and at least two detected non-interpolated poses. A failed gate yields `insufficient_evidence` without a remote call. These are engineering safeguards, not clinically validated thresholds; the available pose/motion information cannot establish all verbal behaviours.
+The deterministic CMAI-aware gate currently requires a recognized taxonomy label, at least two source observations with strictly increasing times, and at least two detected non-interpolated poses. Hitting additionally needs measured arm-motion features from the baseline or timestamped wrist speed/acceleration and pose evidence from a prototype candidate. A failed gate yields `insufficient_evidence` without a remote call. These are engineering safeguards, not clinically validated thresholds; the available pose/motion information cannot establish all verbal behaviours.
 
 ## Qwen through Groq
 
