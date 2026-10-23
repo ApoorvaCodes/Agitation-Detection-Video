@@ -14,6 +14,7 @@ from pathlib import Path
 from statistics import median
 
 from person2.contracts import BehaviourEvent
+from person2.embeddings import usable_pose
 from cmai.taxonomy import validate_canonical_cmai_behaviour
 
 
@@ -48,6 +49,8 @@ def _value(observation, name):
 
 
 def _point(observation, name):
+    if not usable_pose(observation, name):
+        return None
     pose = observation.normalized_pose
     landmark = pose.landmarks.get(name) if pose else None
     if landmark is None or landmark.x is None or landmark.y is None:
@@ -86,6 +89,14 @@ def _baseline(values, multiplier):
 def _valid_fraction(rows):
     return sum(not o.quality.bbox_interpolated and bool(o.quality.pose_detected)
                for o in rows) / len(rows) if rows else 0.0
+
+
+def _impulsive_motion(rows, config):
+    return any(
+        (_value(o, f"{side}_{joint}.velocity.speed") or 0) >= float(rule["speed_floor"])
+        and (_value(o, f"{side}_{joint}.acceleration.magnitude") or 0) >= float(rule["acceleration_floor"])
+        for o in rows for side in ("left", "right")
+        for joint, rule in (("wrist", config.hitting), ("ankle", config.kicking)))
 
 
 def _groups(rows, flags):
@@ -152,6 +163,8 @@ class DemoPhysicalBehaviourDetector:
                       key=lambda event: (event.start_timestamp, event.behaviour))
 
     def detect(self, result, source):
+        if not self.config.enabled:
+            return result
         source_people = {person.person_id: person for person in source.persons}
         for person in result.persons:
             source_person = source_people.get(person.person_id)
@@ -169,6 +182,20 @@ class DemoPhysicalBehaviourDetector:
                     continue
             candidates = [candidate for candidate in candidates if candidate.chunk_ids]
             person.events.extend(candidates)
+            # The independent movement baseline runs before the demo rules.
+            # Resolve its broad label against specific evidence from either path.
+            specific = [event for event in person.events if event.behaviour in {
+                "cmai_07_hitting", "cmai_08_kicking", "cmai_26_repetitious_mannerisms",
+                "cmai_01_pacing_aimless_wandering"}]
+            person.events = [event for event in person.events
+                             if event.behaviour != "cmai_29_general_restlessness"
+                             or (not any(action.start_timestamp < event.end_timestamp
+                                         and event.start_timestamp < action.end_timestamp
+                                         for action in specific)
+                                 and not _impulsive_motion(
+                                     [row for row in source_person.observations
+                                      if event.start_timestamp <= row.timestamp <= event.end_timestamp],
+                                     self.config))]
             person.events.sort(key=lambda event: (event.start_timestamp, event.behaviour))
         return result
 
@@ -196,7 +223,8 @@ class DemoPhysicalBehaviourDetector:
                         break
                     later_speed = _value(later, f"{side}_wrist.velocity.speed")
                     later_wrist, later_shoulder = _point(later, f"{side}_wrist"), _point(later, f"{side}_shoulder")
-                    later_extension = _distance(later_wrist, later_shoulder) / max(_distance(later_shoulder, opposite), 1e-6) if later_wrist and later_shoulder and opposite else None
+                    later_opposite = _point(later, "right_shoulder" if side == "left" else "left_shoulder")
+                    later_extension = _distance(later_wrist, later_shoulder) / max(_distance(later_shoulder, later_opposite), 1e-6) if later_wrist and later_shoulder and later_opposite else None
                     return_seen |= (speed is not None and later_speed is not None and later_speed <= speed * float(cfg["return_speed_ratio"])) or (extension is not None and later_extension is not None and later_extension <= extension * float(cfg["return_extension_ratio"]))
                 if speed is not None and acceleration is not None and extension is not None and speed >= speed_cut and acceleration >= acceleration_cut and extension >= float(cfg["extension_threshold"]) and return_seen:
                     sides.append((side, speed, acceleration, extension))
@@ -236,13 +264,20 @@ class DemoPhysicalBehaviourDetector:
             for side in ("left", "right"):
                 speed = _value(row, f"{side}_ankle.velocity.speed")
                 acceleration = _value(row, f"{side}_ankle.acceleration.magnitude")
-                angular_velocity = _value(row, f"{side}_knee.angular_velocity")
+                # At the sampled frame rate the knee often extends just before
+                # ankle speed peaks. Require nearby extension evidence rather
+                # than requiring both peaks in exactly the same frame.
+                recent = [o for o in rows[:i + 1] if 0 <= row.timestamp - o.timestamp <= .4]
+                angular_velocity = max((_value(o, f"{side}_knee.angular_velocity") or 0
+                                        for o in recent), default=0)
                 angle = _angle(_point(row, f"{side}_hip"), _point(row, f"{side}_knee"), _point(row, f"{side}_ankle"))
                 return_seen = bool(speed is not None and any(
-                    later.timestamp - row.timestamp <= float(cfg["return_seconds"])
-                    and (_value(later, f"{side}_ankle.velocity.speed") or math.inf) <= speed * float(cfg["return_speed_ratio"])
+                    0 < later.timestamp - row.timestamp <= float(cfg["return_seconds"])
+                    and _point(later, f"{side}_ankle") is not None
+                    and (later_speed := _value(later, f"{side}_ankle.velocity.speed")) is not None
+                    and later_speed <= speed * float(cfg["return_speed_ratio"])
                     for later in rows[i + 1:]))
-                if speed is not None and acceleration is not None and angular_velocity is not None and angle is not None and speed >= speed_cut and acceleration >= acceleration_cut and abs(angular_velocity) >= float(cfg["knee_angular_velocity_floor"]) and angle >= float(cfg["knee_angle_threshold"]) and return_seen:
+                if speed is not None and acceleration is not None and angle is not None and speed >= speed_cut and acceleration >= acceleration_cut and angular_velocity >= float(cfg["knee_angular_velocity_floor"]) and angle >= float(cfg["knee_angle_threshold"]) and return_seen:
                     legs.append((side, speed, acceleration, angle))
             flags.append(bool(legs))
             if legs:
@@ -325,7 +360,7 @@ class DemoPhysicalBehaviourDetector:
         cfg = self.config.repetitive
         signal = [max((_value(o, "left_wrist.velocity.speed") or 0), (_value(o, "right_wrist.velocity.speed") or 0)) for o in rows]
         baseline = _baseline(signal, self.config.baseline_mad_multiplier) or 0
-        peaks = [i for i in range(1, len(signal) - 1) if signal[i] >= baseline and signal[i] >= signal[i - 1] and signal[i] >= signal[i + 1]]
+        peaks = [i for i in range(1, len(signal) - 1) if signal[i] >= baseline and signal[i] > signal[i - 1] and signal[i] >= signal[i + 1]]
         separated = []
         for peak in peaks:
             if not separated or peak - separated[-1] >= int(cfg["min_peak_separation"]):
@@ -350,6 +385,12 @@ class DemoPhysicalBehaviourDetector:
             energy = window.features.get("overall_motion_energy")
             if not window.low_quality and energy is not None and energy >= float(cfg["motion_energy_floor"]) and window.end_timestamp - window.start_timestamp >= float(cfg["min_duration"]):
                 selected = [o for o in rows if window.start_timestamp <= o.timestamp <= window.end_timestamp]
+                if not selected or _valid_fraction(selected) < self.config.min_valid_fraction:
+                    continue
+                # A failed specific-action rule (e.g. missing return/contact
+                # evidence) is not positive evidence of general restlessness.
+                if _impulsive_motion(selected, self.config):
+                    continue
                 return [_candidate(person_id, "cmai_29_general_restlessness", selected, chunks, {
                     "description": "Sustained elevated whole-body motion without a stronger specific action rule.",
                     "features": {"overall_motion_energy": energy, "arm_motion_energy": window.features.get("arm_motion_energy"), "leg_motion_energy": window.features.get("leg_motion_energy")},

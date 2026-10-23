@@ -378,8 +378,8 @@
           "default": "uncalibrated_cosine_similarity",
           "enum": [
             "uncalibrated_cosine_similarity",
-            "demo_rule_evidence_strength_not_probability",
-            "heuristic_motion_score"
+            "heuristic_motion_score",
+            "demo_rule_evidence_strength_not_probability"
           ],
           "title": "Score Semantics",
           "type": "string"

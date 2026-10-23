@@ -37,6 +37,11 @@ def fixture(label=HIT, contact='observed', times=None):
             o.quality.feature_validity[j+'.velocity.speed']=True
     data.video.feature_names=['left_wrist.velocity.speed','left_ankle.velocity.speed']
     data.persons.append(TrackedPerson(person_id='target',observations=[o.model_copy(deep=True) for o in data.persons[0].observations]))
+    # The target supplies a visible track, not a second copy of the actor's
+    # action features. Duplicated features are indistinguishable to the model.
+    for o in data.persons[1].observations:
+        o.motion = None
+        o.quality.feature_validity.clear()
     cfg=Person2Config(window_seconds=1,overlap=0,min_frames=3,min_valid_fraction=.8,video_weight=0,max_gap_seconds=.35)
     embedding=process_perception(data,cfg).persons[0].chunks[0].fused_embedding
     negative=embedding.model_copy(update={'values':[-v for v in embedding.values]})
@@ -232,15 +237,16 @@ def test_ambiguous_training_never_becomes_negative_and_reports_abstentions(tmp_p
     report=run_action_experiments(path,tmp_path/'out',cfg)
     assert report['status']=='incomplete_evaluation'
     assert all('negative examples required' in v['reason'] for v in report['variants'].values())
-    # Missing contact on test is a false negative and an explicit abstention.
+    # Hitting scores arm motion without optional contact. Its contact-grounded
+    # event metric remains unmatched, while motion assessment coverage remains.
     raw=manifest_fixture(tmp_path)
     raw['recordings'][2]['interaction_evidence']=None
     path.write_text(json.dumps(raw))
     report=run_action_experiments(path,tmp_path/'out2',cfg,thresholds=[.5],margins=[0])
     for v in report['variants'].values():
         m=v['metrics']['test']['events']['per_item'][HIT]
-        assert m['fn']==1 and m['tp']==0 and m['coverage']==0
-        assert m['abstained_positive'] and m['abstained_negative']
+        assert m['fn']==1 and m['tp']==0 and m['coverage']==1
+        assert not m['abstained_positive'] and not m['abstained_negative']
 
 
 def test_person3_does_not_verify_contactless_action():
@@ -279,9 +285,13 @@ def test_synthetic_punch_reaches_person3_with_source_timestamps_and_camera_resul
     # Train the synthetic two-centroid baseline on this controlled example and
     # a contrasting negative. Production bundles require permitted labelled data.
     cfg=bundle.metadata.configuration
-    seed=process_perception(data,cfg).persons[0].chunks[0].fused_embedding
-    negative=seed.model_copy(update={'values':[-v for v in seed.values]})
-    model=train_action_model([(HIT,'positive',seed),(HIT,'negative',negative)],[HIT],'synthetic-punch-fixture',{})
+    # Both the extension and recovery windows must be represented in training
+    # to meet the unchanged consecutive-window gate at this model threshold.
+    seeds=[c.fused_embedding for c in process_perception(data,cfg).persons[0].chunks]
+    examples=[example for seed in seeds for example in (
+        (HIT,'positive',seed),
+        (HIT,'negative',seed.model_copy(update={'values':[-v for v in seed.values]})))]
+    model=train_action_model(examples,[HIT],'synthetic-punch-fixture',{})
     bundle=replace(bundle,action_model=model,bank=model.positive_bank())
     p2,checks=detect_with_assessments(data,bundle,contacts,recording_sha256=HASH)
     assert p2.persons[0].events and p2.persons[0].events[0].behaviour==HIT
