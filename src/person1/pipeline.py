@@ -5,7 +5,11 @@ from person1.config import Person1Config
 from person1.contracts import BoundingBox, Landmark, MotionFeatures, ObservationQuality, Person1VideoResult, PersonObservation, PoseData, TrackedPerson, Vector3, VideoMetadata
 from person1.features import aggregate_windows, enrich_observations, feature_names, joint_angles, normalize_landmarks, vector_features, window_feature_names
 from person1.ingestion import VideoLoader
-from person1.perception import Detector, Detection, MediaPipePoseEstimator, PoseEstimator, UltralyticsPersonDetector, UltralyticsPersonTracker, MEDIAPIPE_LANDMARK_NAMES
+from person1.perception import (Detector, Detection, MediaPipePoseEstimator,
+                                MediaPipeTasksPoseEstimator, PoseEstimator,
+                                UltralyticsPoseEstimator,
+                                UltralyticsPersonDetector, UltralyticsPersonTracker,
+                                MEDIAPIPE_LANDMARK_NAMES)
 from person1.tracking import IoUTracker
 
 class _State:
@@ -18,12 +22,32 @@ class Person1Pipeline:
         with VideoLoader(path) as loader:
             if self.detector is None and self.config.tracker == "iou_fallback": self.detector=UltralyticsPersonDetector(self.config.yolo_model,self.config.yolo_confidence_threshold,self.config.yolo_iou_threshold)
             if self.detector is None: self.detector=UltralyticsPersonTracker(self.config.yolo_model,self.config.yolo_confidence_threshold,self.config.yolo_iou_threshold,self.config.tracker)
-            if self.pose_estimator is None: self.pose_estimator=MediaPipePoseEstimator(self.config.pose_model_complexity,self.config.pose_min_detection_confidence,self.config.pose_min_tracking_confidence)
+            if self.pose_estimator is None:
+                if self.config.pose_backend == "ultralytics_pose_cpu":
+                    asset = Path(self.config.pose_model_asset)
+                    if not asset.is_absolute():
+                        asset = Path(__file__).resolve().parents[2] / asset
+                    self.pose_estimator = UltralyticsPoseEstimator(
+                        asset, self.config.pose_min_detection_confidence)
+                elif self.config.pose_backend == "mediapipe_tasks_cpu":
+                    asset = Path(self.config.pose_model_asset)
+                    if not asset.is_absolute():
+                        asset = Path(__file__).resolve().parents[2] / asset
+                    self.pose_estimator = MediaPipeTasksPoseEstimator(
+                        asset, self.config.pose_min_detection_confidence,
+                        self.config.pose_min_tracking_confidence)
+                else:
+                    self.pose_estimator = MediaPipePoseEstimator(
+                        self.config.pose_model_complexity,
+                        self.config.pose_min_detection_confidence,
+                        self.config.pose_min_tracking_confidence)
             persons: dict[str,TrackedPerson]={}; states: dict[str,_State]={}
             diagnostics={"frames_processed":0,"frames_with_yolo_person_detection":0,
                         "person_detections":0,"frames_with_valid_mediapipe_pose":0,
                         "frames_with_valid_left_wrist":0,"frames_with_valid_right_wrist":0,
-                        "frames_with_valid_left_arm_chain":0,"frames_with_valid_right_arm_chain":0}
+                        "frames_with_valid_left_arm_chain":0,"frames_with_valid_right_arm_chain":0,
+                        "raw_landmarks":0,"usable_landmarks":0,"missing_or_low_confidence_landmarks":0,
+                        "observations":0,"interpolated_observations":0,"feature_values_calculated":0}
             counted_frames={key:set() for key in diagnostics if key.startswith("frames_with_valid_")}
             for frame in loader.frames(self.config.frame_sample_fps):
                 diagnostics["frames_processed"] += 1
@@ -34,11 +58,15 @@ class Person1Pipeline:
                     diagnostics["frames_with_yolo_person_detection"] += 1
                     diagnostics["person_detections"] += len(detections)
                 for track_id,detection in detections:
+                    diagnostics["observations"] += 1
                     persons.setdefault(track_id,TrackedPerson(person_id=track_id))
                     crop, crop_box=_crop(frame.image,detection,self.config.crop_padding); raw_pose=self.pose_estimator.estimate(crop); raw=_map_pose(raw_pose.landmarks,crop_box,frame.image.shape) if raw_pose else {}
                     if raw:
                         counted_frames["frames_with_valid_mediapipe_pose"].add(frame.frame_index)
                     usable_raw={n:v for n,v in raw.items() if _landmark_confident(v,self.config.min_landmark_visibility)}
+                    diagnostics["raw_landmarks"] += len(raw)
+                    diagnostics["usable_landmarks"] += len(usable_raw)
+                    diagnostics["missing_or_low_confidence_landmarks"] += max(0, len(MEDIAPIPE_LANDMARK_NAMES) - len(usable_raw))
                     normalized=normalize_landmarks(usable_raw) if usable_raw else {}; previous=states.get(track_id); gap=frame.timestamp-previous.timestamp if previous else None
                     valid={n:_point(v) for n,v in normalized.items() if _point(v)}; motion=None; feature_validity={}
                     for side in ("left","right"):
@@ -63,11 +91,33 @@ class Person1Pipeline:
                     observation=PersonObservation(timestamp=frame.timestamp,frame_index=frame.frame_index,bbox=bbox,detection_confidence=detection.confidence,pose=_pose(raw),normalized_pose=_pose(normalized,False),motion=motion,quality=ObservationQuality(detection_confidence=detection.confidence,pose_quality=len(valid)/33 if raw else None,valid_landmarks=len(valid),temporal_gap_seconds=gap,feature_validity=feature_validity,pose_detected=bool(raw),landmark_validity={n:bool(_point(v)) for n,v in normalized.items()}))
                     persons[track_id].observations.append(observation)
         metadata=loader.metadata
+        close_pose = getattr(self.pose_estimator, "close", None)
+        if callable(close_pose):
+            close_pose()
         diagnostics.update({key:len(indices) for key,indices in counted_frames.items()})
+        diagnostics.update({"frames_decoded": getattr(loader, "decoded_frames", diagnostics["frames_processed"]),
+                            "frames_analysed": diagnostics["frames_processed"],
+                            "unique_tracks": len(persons),
+                            "frames_with_person_detection_pct": (diagnostics["frames_with_yolo_person_detection"] /
+                                diagnostics["frames_processed"] if diagnostics["frames_processed"] else 0.0),
+                            "pose_success_pct_of_detection_frames": (diagnostics["frames_with_valid_mediapipe_pose"] /
+                                diagnostics["frames_with_yolo_person_detection"] if diagnostics["frames_with_yolo_person_detection"] else 0.0),
+                            "landmark_usability_pct": (diagnostics["usable_landmarks"] /
+                                diagnostics["raw_landmarks"] if diagnostics["raw_landmarks"] else 0.0)})
+        diagnostics["track_fragmentation"] = 0
+        for person in persons.values():
+            ordered = sorted(person.observations, key=lambda o: o.frame_index)
+            diagnostics["track_fragmentation"] += sum(
+                1 for left, right in zip(ordered, ordered[1:])
+                if right.frame_index - left.frame_index > self.config.max_gap_frames + 1)
         config_snapshot={k:v for k,v in self.config.__dict__.items() if k != "video_id"}
         for person in persons.values():
             person.observations=_interpolate_observations(person.observations,self.config.max_gap_frames)
+            diagnostics["interpolated_observations"] += sum(o.quality.bbox_interpolated for o in person.observations)
             enrich_observations(person.observations,self.config.max_temporal_gap_seconds,self.config.min_delta_time_seconds)
+            diagnostics["feature_values_calculated"] += sum(
+                sum(v is not None for v in (o.motion.feature_values.values() if o.motion else {}.values()))
+                for o in person.observations)
             person.windows=aggregate_windows(person.observations,self.config.window_seconds,self.config.window_overlap,self.config.low_quality_valid_fraction)
             if person.observations:
                 confidences=[o.detection_confidence for o in person.observations]; interpolated=sum(o.quality.bbox_interpolated for o in person.observations); person.statistics={"first_frame":person.observations[0].frame_index,"last_frame":person.observations[-1].frame_index,"visible_frames":len(person.observations)-interpolated,"mean_detection_confidence":sum(confidences)/len(confidences),"fraction_interpolated":interpolated/len(person.observations),"duration_seconds":person.observations[-1].timestamp-person.observations[0].timestamp}

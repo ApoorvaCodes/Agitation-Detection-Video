@@ -55,6 +55,20 @@ def test_repeated_back_and_forth_is_pacing_and_traceable():
     assert event[4]["direction_reversals"]>=2
     assert len(event[4]["source_observation_ids"])==13
     assert event[4]["path_length_body_scales"]>event[4]["net_displacement_body_scales"]
+    assert event[4]["moving_step_count"] > 0
+    assert event[4]["direction_sequence"]
+
+
+def test_pacing_diagnostics_report_sample_cadence_without_interpolated_rows():
+    track = make_track([.2, .4, .6, .4, .2, .4, .6, .4, .2],
+                       times=[i * .2 for i in range(9)])
+    for row in track.observations[3:5]:
+        row.quality.bbox_interpolated = True
+    events, diagnostics = analyze_movement_patterns(track, config(min_track_seconds=1))
+    assert not events
+    assert diagnostics["pacing"]["valid_track_observations"] == 7
+    assert diagnostics["pacing"]["configured_sampling_fps"] is None
+    assert diagnostics["pacing"]["median_observation_interval_seconds"] == pytest.approx(.2)
 
 
 def test_short_track_abstains_and_irregular_gaps_are_safe():
@@ -97,6 +111,7 @@ def test_repeated_stationary_pose_motion_generates_restlessness():
     assert event[4]["repeated_movement_burst_count"]>=3
     assert event[4]["upper_body_movement_frequency"]>0
     assert event[4]["source_observation_ids"]
+    assert event[4]["valid_motion_pair_count"] > 0
 
 
 def test_missing_pose_joints_and_low_coverage_abstain_without_fabrication():
@@ -177,3 +192,17 @@ def test_restlessness_is_consistent_when_person_bbox_scale_changes():
     second=analyze_movement_patterns(smaller,config())[0]
     assert any(e[0]=="cmai_29_general_restlessness" for e in first)
     assert any(e[0]=="cmai_29_general_restlessness" for e in second)
+
+
+def test_restlessness_coverage_ignores_non_movement_landmarks_and_invalid_rows():
+    # A real pose estimator can return face landmarks while one or more body
+    # frames are unusable. Coverage must describe the movement landmarks that
+    # this detector consumes, without counting the invalid rows twice.
+    track = burst_track()
+    for row in track.observations[0:8]:
+        row.quality.pose_detected = False
+        row.normalized_pose = PoseData(landmarks={})
+        row.quality.landmark_validity = {}
+    events, diagnostics = analyze_movement_patterns(track, config(min_valid_coverage=.6))
+    assert any(event[0] == "cmai_29_general_restlessness" for event in events)
+    assert diagnostics["restlessness"]["valid_landmark_coverage"] == pytest.approx(1.0)

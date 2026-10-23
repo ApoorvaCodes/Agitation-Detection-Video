@@ -17,6 +17,8 @@ class Person1Config:
     window_overlap: float = 0.5
     low_quality_valid_fraction: float = 0.6
     pose_model_complexity: int = 1
+    pose_backend: str = "ultralytics_pose_cpu"
+    pose_model_asset: str = "models/yolo11n-pose.pt"
     pose_min_detection_confidence: float = 0.5
     pose_min_tracking_confidence: float = 0.5
     min_landmark_visibility: float = 0.5
@@ -29,6 +31,8 @@ class Person1Config:
         if not 0 <= self.yolo_confidence_threshold <= 1: raise ValueError("confidence must be in [0,1]")
         if self.max_temporal_gap_seconds <= 0 or self.min_delta_time_seconds <= 0: raise ValueError("temporal durations must be positive")
         if self.tracker not in {"bytetrack", "botsort", "iou_fallback"}: raise ValueError("tracker must be bytetrack, botsort, or iou_fallback")
+        if self.pose_backend not in {"ultralytics_pose_cpu", "mediapipe_tasks_cpu", "mediapipe_legacy"}: raise ValueError("unsupported pose_backend")
+        if not self.pose_model_asset.strip(): raise ValueError("pose_model_asset must not be empty")
         if self.max_gap_frames < 0 or self.min_track_frames < 1: raise ValueError("invalid track limits")
 
     @classmethod

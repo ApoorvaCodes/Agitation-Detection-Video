@@ -70,6 +70,7 @@ def _usable_track(person, config):
 def _pacing(rows, person_id, config, sampling_fps=None):
     duration = rows[-1].timestamp - rows[0].timestamp if len(rows) > 1 else 0.0
     dts = [b.timestamp-a.timestamp for a,b in zip(rows, rows[1:]) if 0 < b.timestamp-a.timestamp <= config.max_gap_seconds]
+    median_dt = sorted(dts)[len(dts) // 2] if dts else None
     expected = (max(1, round(duration * sampling_fps) + 1) if sampling_fps and sampling_fps > 0 else
                 max(1, round(duration / (sorted(dts)[len(dts)//2] if dts else max(duration, 1.0))) + 1))
     coverage = min(1.0, len(rows) / expected)
@@ -112,6 +113,8 @@ def _pacing(rows, person_id, config, sampling_fps=None):
         "net_displacement_body_scales":net,"movement_duration_seconds":movement_duration,
         "track_duration_seconds":duration,"direction_reversals":reversals,
         "path_recurrence":recurrence,"valid_track_coverage":coverage,"valid_track_observations":len(rows),
+        "configured_sampling_fps":sampling_fps,"median_observation_interval_seconds":median_dt,
+        "moving_step_count":len(steps),"direction_sequence":[d for d in directions if d is not None],
         "source_observation_ids":[f"{person_id}:frame:{o.frame_index}" for o in rows],
         "observation_timestamps":[o.timestamp for o in rows],"acceptance_reasons":["repeated_traversal_pattern"] if accepted else [],
         "abstention_reasons":reasons}
@@ -179,7 +182,10 @@ def _restlessness(rows, person_id, config, pacing_found, locomotion_dominant):
     reasons=[]
     if duration<config.min_track_seconds: reasons.append("track_duration_below_minimum")
     if len(valid)<config.min_pose_frames: reasons.append("valid_pose_frames_below_minimum")
-    coverage=sum(len(set(p)&relevant) for _,p in valid)/max(1,len(rows)*len(relevant))
+    # Coverage is over movement landmarks, not the full MediaPipe schema. The
+    # latter contains face/hand landmarks that this detector never consumes and
+    # made otherwise usable generated-video poses abstain as low quality.
+    coverage=sum(len(set(p)&relevant) for _,p in valid)/max(1,len(valid)*len(relevant))
     if coverage<config.min_valid_coverage: reasons.append("valid_pose_coverage_below_minimum")
     if pacing_found or locomotion_dominant: reasons.append("clear_locomotion_excluded_from_restlessness")
     if bursts<config.min_restlessness_bursts: reasons.append("repeated_movement_bursts_below_minimum")
@@ -189,6 +195,7 @@ def _restlessness(rows, person_id, config, pacing_found, locomotion_dominant):
     evidence={"detector":"restlessness_pose_motion_v1","experimental":True,"valid_pose_frame_count":len(valid),
         "valid_landmark_coverage":coverage,"valid_pose_frame_coverage":len(valid)/max(1,len(rows)),
         "motion_observations_per_window":moving_count,"repeated_movement_burst_count":bursts,
+        "valid_motion_pair_count":len(per_frame),"burst_pause_seconds":1.25,
         "movement_persistence":moving_fraction,"upper_body_movement_frequency":arm_moving/max(duration,1e-6),
         "lower_body_movement_frequency":leg_moving/max(duration,1e-6),
         "movement_frequency_per_second":movement_frequency,"posture_change_count":posture_changes,

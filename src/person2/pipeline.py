@@ -118,7 +118,12 @@ def process_perception(source: Person1VideoResult, config: Person2Config | None 
                                                  and o.motion.feature_values.get(n) is not None
                                                  and np.isfinite(o.motion.feature_values[n]) for n in names))
                 valid_frames += int(not o.quality.bbox_interpolated and (pose_ok or motion_ok))
-            expected = max(len(observations), math.ceil((chunk.end - chunk.start) * fps - 1e-9))
+            # Person 1 may insert interpolated rows at the source-video frame
+            # rate between sampled detections. Those rows are useful for
+            # feature continuity but are not additional independent evidence.
+            # Quality must therefore be measured against the configured sample
+            # cadence, not len(observations).
+            expected = max(1, math.ceil((chunk.end - chunk.start) * fps - 1e-9))
             fraction = valid_frames / expected
             low_quality = len(observations) < config.min_frames or fraction < config.min_valid_fraction
             status = "low_quality" if low_quality else "no_prototypes" if not prototypes or not prototypes.prototypes else "scored"

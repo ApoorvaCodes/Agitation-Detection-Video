@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from pathlib import Path
+import platform
 from typing import Any, Protocol
 import cv2
 import importlib.metadata
@@ -31,7 +33,8 @@ class Detector(Protocol):
 class PoseEstimator(Protocol):
     def estimate(self, crop: Any) -> PoseResult | None: ...
 
-def runtime_diagnostics(model_name: str, tracker: str) -> dict[str, str]:
+def runtime_diagnostics(model_name: str, tracker: str, pose_backend: str = "ultralytics_pose_cpu",
+                        pose_model_asset: str | None = None) -> dict[str, str]:
     """Return the runtime facts needed to diagnose model-loading failures."""
     def package_version(name):
         try:
@@ -48,8 +51,14 @@ def runtime_diagnostics(model_name: str, tracker: str) -> dict[str, str]:
         "ultralytics_importable": str(importlib.util.find_spec("ultralytics") is not None).lower(),
         "ultralytics_version": package_version("ultralytics"),
         "mediapipe_version": package_version("mediapipe"),
+        "operating_system": platform.system(),
+        "architecture": platform.machine(),
         "model": model_name,
         "tracker": tracker,
+        "pose_backend": pose_backend,
+        "pose_delegate": "CPU" if pose_backend in {"ultralytics_pose_cpu", "mediapipe_tasks_cpu"} else "legacy-default",
+        "pose_model_asset": pose_model_asset or "",
+        "pose_model_asset_available": str(bool(pose_model_asset and Path(pose_model_asset).is_file())).lower(),
     }
 
 def _model_load_error(model_name: str, tracker: str, exc: Exception) -> ModelLoadError:
@@ -105,3 +114,114 @@ class MediaPipePoseEstimator:
             if not result.pose_landmarks: return None
             return PoseResult({self.names[i] if i < len(self.names) else f"landmark_{i}": {"x": float(p.x), "y": float(p.y), "z": float(p.z), "visibility": _optional_confidence(p,"visibility"), "presence": _optional_confidence(p,"presence")} for i,p in enumerate(result.pose_landmarks.landmark)})
         except Exception as exc: raise PoseEstimationError(f"MediaPipe pose inference failed: {exc}") from exc
+
+
+class MediaPipeTasksPoseEstimator:
+    """Portable MediaPipe Tasks pose adapter using an explicit CPU delegate.
+
+    The legacy ``mp.solutions.pose`` graph can create an NSOpenGL context on
+    macOS even though callers only request CPU processing. Tasks exposes the
+    delegate choice directly and this crop-based adapter intentionally uses
+    IMAGE mode, so independent person crops do not share video timestamps or
+    tracker state.
+    """
+    supports_video_timestamps = False
+
+    def __init__(self, model_asset: str | Path, min_detection_confidence: float,
+                 min_tracking_confidence: float):
+        self.model_asset = Path(model_asset).expanduser().resolve()
+        if not self.model_asset.is_file():
+            raise ModelLoadError(
+                f"MediaPipe Tasks pose model asset is missing: {self.model_asset}. "
+                "Run `python scripts/setup_models.py` in the active virtual environment."
+            )
+        try:
+            import mediapipe as mp
+            base_options = mp.tasks.BaseOptions(
+                model_asset_path=str(self.model_asset),
+                delegate=mp.tasks.BaseOptions.Delegate.CPU)
+            options = mp.tasks.vision.PoseLandmarkerOptions(
+                base_options=base_options,
+                running_mode=mp.tasks.vision.RunningMode.IMAGE,
+                num_poses=1,
+                min_pose_detection_confidence=min_detection_confidence,
+                min_pose_presence_confidence=min_detection_confidence,
+                min_tracking_confidence=min_tracking_confidence)
+            self.landmarker = mp.tasks.vision.PoseLandmarker.create_from_options(options)
+            self._mp = mp
+        except Exception as exc:
+            raise ModelLoadError(
+                f"Could not initialize MediaPipe Tasks CPU Pose Landmarker from "
+                f"{self.model_asset}: {exc}. Verify the model asset and the active "
+                "Python environment; no GPU/OpenGL backend is required."
+            ) from exc
+
+    def estimate(self, crop: Any) -> PoseResult | None:
+        try:
+            rgb_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+            image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=rgb_crop)
+            result = self.landmarker.detect(image)
+            if not result.pose_landmarks:
+                return None
+            landmarks = result.pose_landmarks[0]
+            return PoseResult({MEDIAPIPE_LANDMARK_NAMES[i] if i < len(MEDIAPIPE_LANDMARK_NAMES) else f"landmark_{i}":
+                               {"x": float(point.x), "y": float(point.y), "z": float(point.z),
+                                "visibility": getattr(point, "visibility", None),
+                                "presence": getattr(point, "presence", None)}
+                               for i, point in enumerate(landmarks)})
+        except Exception as exc:
+            raise PoseEstimationError(f"MediaPipe Tasks CPU pose inference failed: {exc}") from exc
+
+    def close(self) -> None:
+        close = getattr(self.landmarker, "close", None)
+        if callable(close):
+            close()
+
+
+class UltralyticsPoseEstimator:
+    """CPU Ultralytics pose adapter with an explicit COCO-to-P1 mapping."""
+    supports_video_timestamps = False
+    COCO_NAMES = ("nose", "left_eye", "right_eye", "left_ear", "right_ear",
+                  "left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
+                  "left_wrist", "right_wrist", "left_hip", "right_hip",
+                  "left_knee", "right_knee", "left_ankle", "right_ankle")
+
+    def __init__(self, model_asset: str | Path, confidence: float):
+        self.model_asset = Path(model_asset).expanduser().resolve()
+        if not self.model_asset.is_file():
+            raise ModelLoadError(
+                f"Ultralytics pose model asset is missing: {self.model_asset}. "
+                "Run `python scripts/setup_models.py` in the active virtual environment."
+            )
+        try:
+            from ultralytics import YOLO
+            self.model = YOLO(str(self.model_asset))
+            self.confidence = confidence
+        except Exception as exc:
+            raise ModelLoadError(f"Could not initialize Ultralytics CPU pose model from {self.model_asset}: {exc}") from exc
+
+    def estimate(self, crop: Any) -> PoseResult | None:
+        try:
+            height, width = crop.shape[:2]
+            result = self.model.predict(crop, conf=self.confidence, device="cpu", verbose=False)[0]
+            if result.keypoints is None or len(result.keypoints) == 0:
+                return None
+            xy = result.keypoints.xy[0].detach().cpu().numpy()
+            confidence = (result.keypoints.conf[0].detach().cpu().numpy()
+                          if result.keypoints.conf is not None else [None] * len(xy))
+            landmarks = {}
+            for index, point in enumerate(xy):
+                if index >= len(self.COCO_NAMES):
+                    break
+                score = None if confidence[index] is None else float(confidence[index])
+                landmarks[self.COCO_NAMES[index]] = {
+                    "x": float(point[0]) / width, "y": float(point[1]) / height,
+                    "z": None, "visibility": score, "presence": score}
+            return PoseResult(landmarks)
+        except Exception as exc:
+            raise PoseEstimationError(f"Ultralytics CPU pose inference failed: {exc}") from exc
+
+    def close(self) -> None:
+        # Ultralytics owns no persistent native session that needs explicit
+        # teardown for this adapter; release the reference for repeated jobs.
+        self.model = None

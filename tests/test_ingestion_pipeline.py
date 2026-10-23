@@ -15,12 +15,16 @@ def test_loader_and_pipeline(tmp_path):
     path=tmp_path/"fixture.avi"; writer=cv2.VideoWriter(str(path),cv2.VideoWriter_fourcc(*"MJPG"),10,(32,32)); [writer.write(np.zeros((32,32,3),dtype=np.uint8)) for _ in range(3)]; writer.release()
     with VideoLoader(path) as loader:
         frames=list(loader.frames(sample_fps=None)); assert [f.frame_index for f in frames]==[0,1,2]; assert frames[-1].timestamp>=frames[0].timestamp
+        assert loader.decoded_frames == 3 and loader.sampled_frames == 3
     result=Person1Pipeline(Person1Config(frame_sample_fps=None),FakeDetector(),FakePose()).process(path)
     assert result.schema_version=="1.0" and len(result.persons)==1 and len(result.persons[0].observations)==3
     assert result.diagnostics["frames_processed"]==3
     assert result.diagnostics["frames_with_yolo_person_detection"]==3
     assert result.diagnostics["frames_with_valid_mediapipe_pose"]==3
     assert result.diagnostics["frames_with_valid_left_wrist"]==3
+    assert result.diagnostics["frames_decoded"] == 3
+    assert result.diagnostics["frames_analysed"] == 3
+    assert result.diagnostics["landmark_usability_pct"] > 0
     obs=result.persons[0].observations
     assert obs[0].normalized_pose.landmarks["left_wrist"].x is not None
     assert obs[0].timestamp < obs[-1].timestamp

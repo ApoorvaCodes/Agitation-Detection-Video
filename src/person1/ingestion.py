@@ -39,12 +39,16 @@ class VideoLoader:
         return VideoMetadataRaw(str(self.path), width, height, fps, count, count / fps if count else None, codec, 3)
     def frames(self, sample_fps: float | None = None) -> Iterator[VideoFrame]:
         step = 1 / sample_fps if sample_fps else 0; next_sample = 0.0; index = 0
+        self.decoded_frames = 0
+        self.sampled_frames = 0
         try:
             while True:
                 ok, image = self.capture.read()
                 if not ok: break
+                self.decoded_frames += 1
                 decoder_ms = float(self.capture.get(cv2.CAP_PROP_POS_MSEC)); timestamp = decoder_ms / 1000 if decoder_ms > 0 else index / self.metadata.fps
                 if not step or timestamp + 1e-9 >= next_sample:
+                    self.sampled_frames += 1
                     yield VideoFrame(image, index, timestamp)
                     if step:
                         while next_sample <= timestamp + 1e-9: next_sample += step

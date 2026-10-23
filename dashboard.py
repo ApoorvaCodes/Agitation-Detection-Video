@@ -1,6 +1,6 @@
 """Video-first research app: .venv/bin/python -m streamlit run dashboard.py"""
 from hashlib import sha256
-from dataclasses import replace
+from dataclasses import asdict, replace
 import json
 import os
 from pathlib import Path
@@ -58,6 +58,115 @@ def automatic_verification(p1, p2, api_key, model, action_assessments=None):
     except Exception as exc:
         return "failed", [], f"Qwen verification failed: {type(exc).__name__}: {exc}"
     return "complete", events, None
+
+
+def _debug_frame(source_path, observation):
+    """Render one source frame with the P1 box, track label, and raw pose."""
+    if not source_path:
+        return None
+    import cv2
+    capture = cv2.VideoCapture(source_path)
+    capture.set(cv2.CAP_PROP_POS_FRAMES, observation.frame_index)
+    ok, image = capture.read()
+    capture.release()
+    if not ok:
+        return None
+    height, width = image.shape[:2]
+    box = observation.bbox
+    cv2.rectangle(image, (int(box.x_min * width), int(box.y_min * height)),
+                  (int(box.x_max * width), int(box.y_max * height)), (0, 220, 255), 2)
+    pose = observation.pose
+    if pose:
+        points = {name: (int(lm.x * width), int(lm.y * height))
+                  for name, lm in pose.landmarks.items()}
+        edges = (("left_shoulder", "right_shoulder"), ("left_shoulder", "left_elbow"),
+                 ("left_elbow", "left_wrist"), ("right_shoulder", "right_elbow"),
+                 ("right_elbow", "right_wrist"), ("left_shoulder", "left_hip"),
+                 ("right_shoulder", "right_hip"), ("left_hip", "right_hip"),
+                 ("left_hip", "left_knee"), ("left_knee", "left_ankle"),
+                 ("right_hip", "right_knee"), ("right_knee", "right_ankle"))
+        for left, right in edges:
+            if left in points and right in points:
+                cv2.line(image, points[left], points[right], (50, 220, 50), 2)
+        for point in points.values():
+            cv2.circle(image, point, 3, (30, 30, 255), -1)
+    cv2.putText(image, f"frame {observation.frame_index}  t={observation.timestamp:.2f}s",
+                (8, 22), cv2.FONT_HERSHEY_SIMPLEX, .55, (255, 255, 255), 2)
+    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+
+def render_debug_panel(p1, p2, selected_person, result, source_path):
+    with st.expander("Detection debugging (optional)", expanded=False):
+        st.caption("Diagnostic evidence only. Interpolated observations are marked and are never treated as pose evidence.")
+        st.json({"pipeline": p1.diagnostics,
+                 "person1_configuration": p1.video.configuration,
+                 "person2_configuration": asdict(p2.configuration)})
+        person = next((p for p in p1.persons if p.person_id == selected_person), None)
+        p2_person = next((p for p in p2.persons if p.person_id == selected_person), None)
+        if person is None:
+            st.info("Select a person track to inspect sampled frames and features.")
+            return
+        rows = []
+        for observation in person.observations:
+            rows.append({"frame": observation.frame_index, "timestamp": observation.timestamp,
+                         "track": selected_person, "detection_confidence": observation.detection_confidence,
+                         "pose_detected": observation.quality.pose_detected,
+                         "pose_quality": observation.quality.pose_quality,
+                         "valid_landmarks": observation.quality.valid_landmarks,
+                         "interpolated": observation.quality.bbox_interpolated,
+                         "feature_count": sum(v is not None for v in (observation.motion.feature_values.values()
+                                                                       if observation.motion else []))})
+        st.write("Sampled observations")
+        st.dataframe(rows, use_container_width=True, height=240)
+        if rows and source_path:
+            selected_frame = st.selectbox("Frame overlay", rows,
+                                          format_func=lambda row: f"frame {row['frame']} · {row['timestamp']:.2f}s",
+                                          key=f"debug_frame_{selected_person}")
+            observation = next(o for o in person.observations if o.frame_index == selected_frame["frame"])
+            image = _debug_frame(source_path, observation)
+            if image is not None:
+                st.image(image, caption=("Interpolated box; no pose evidence" if observation.quality.bbox_interpolated
+                                         else "P1 detection, track and raw pose overlay"))
+        if p2_person:
+            import plotly.graph_objects as go
+            feature_names = ["left_wrist.velocity.speed", "right_wrist.velocity.speed",
+                             "left_wrist.acceleration.magnitude", "right_wrist.acceleration.magnitude",
+                             "body_centroid.velocity.speed"]
+            chart = go.Figure()
+            for name in feature_names:
+                values = [(o.timestamp, o.motion.feature_values.get(name)) for o in person.observations
+                          if o.motion and o.motion.feature_values.get(name) is not None]
+                if values:
+                    chart.add_scatter(x=[x for x, _ in values], y=[y for _, y in values], mode="lines+markers", name=name)
+            chart.update_layout(height=300, xaxis_title="Source time (seconds)", yaxis_title="Body-normalized motion")
+            st.plotly_chart(chart, use_container_width=True)
+            score_rows = []
+            threshold = getattr(p2.configuration, "similarity_threshold", None)
+            for chunk in p2_person.chunks:
+                for score in chunk.scores:
+                    score_rows.append({"chunk": chunk.chunk_id, "start": chunk.start_timestamp,
+                                       "end": chunk.end_timestamp, "behaviour": score.behaviour,
+                                       "score": score.similarity, "smoothed": score.smoothed_similarity,
+                                       "threshold": threshold, "candidate": score.candidate,
+                                       "rejection_reason": None if score.candidate else
+                                       ("no_score" if score.smoothed_similarity is None else "below_threshold")})
+            if score_rows:
+                st.write("P2 detector scores and thresholds")
+                st.dataframe(score_rows, use_container_width=True, height=220)
+            st.write("Accepted/rejected movement-baseline diagnostics")
+            st.json(p2_person.movement_diagnostics)
+            mappings = [{"behaviour": event.behaviour, "start": event.start_timestamp,
+                         "end": event.end_timestamp, "source": event.candidate_source,
+                         "score": event.candidate_score, "CMAI": event.canonical_cmai_id or event.behaviour,
+                         "evidence": event.evidence} for event in p2_person.events]
+            final_mappings = [{"behaviour": event.source_label, "start": event.start_timestamp,
+                               "end": event.end_timestamp, "CMAI": event.cmai_item_id,
+                               "status": event.status,
+                               "evidence_frames": event.evidence.frame_indices,
+                               "evidence_chunks": event.evidence.chunk_ids}
+                              for event in result.events if event.evidence.person_id == selected_person]
+            st.write("P2 events and final CMAI evidence")
+            st.json({"p2": mappings, "final_cmai": final_mappings})
 
 
 def render_camera_result(p1, p2, bundle):
@@ -162,6 +271,7 @@ def render_camera_result(p1, p2, bundle):
                         st.error(str(exc))
         else:
             st.info("No reviewable candidates were produced for this track. Missing models, gaps and low-quality evidence remain unknown.")
+        render_debug_panel(p1, p2, selected_person, result, st.session_state.get("source_path"))
     st.download_button("Download camera result", result.model_dump_json(indent=2), "cmai-camera-result.json", "application/json")
     source_path = st.session_state.get("source_path")
     if source_path:
@@ -201,6 +311,7 @@ def main():
         default_bundle = load_bundle(os.getenv("CMAI_DETECTOR_BUNDLE") or None)
         load_taxonomy()
         hitting_config = HittingConfig.load()
+        p1_config = Person1Config.from_yaml(ROOT / "configs/default.yaml")
     except (ValueError, OSError) as exc:
         st.error(f"Detector/taxonomy configuration error: {exc}")
         return
@@ -222,7 +333,11 @@ def main():
         st.caption(f"Detector: {default_bundle.metadata.detector_id} / {default_bundle.metadata.version} · {default_bundle.metadata.mode}")
         st.caption(f"Experimental Hitting motion baseline: {'enabled' if hitting_config.enabled else 'disabled'}")
         with st.expander("Runtime diagnostics"):
-            st.json(runtime_diagnostics("configured-by-P1", default_bundle.metadata.detector_mode))
+            pose_asset = Path(p1_config.pose_model_asset)
+            if not pose_asset.is_absolute():
+                pose_asset = ROOT / pose_asset
+            st.json(runtime_diagnostics(p1_config.yolo_model, p1_config.tracker,
+                                        p1_config.pose_backend, str(pose_asset)))
 
     verifier_fingerprint = sha256((api_key + "\0" + model).encode()).hexdigest()
     if st.session_state.get("verifier_fingerprint") != verifier_fingerprint:
@@ -278,8 +393,7 @@ def main():
                 if bank is not None and default_bundle.metadata.detector_mode == "interaction_actions":
                     raise ValueError("Action bundles require positive and negative supervised assets; positive-only prototype overrides are unsupported.")
                 interactions = InteractionEvidence.model_validate_json(interaction_file.getvalue()) if interaction_file is not None else None
-                config = Person1Config.from_yaml(ROOT / "configs/default.yaml")
-                config = replace(config, video_id="video-" + sha256(video_file.getvalue()).hexdigest()[:16])
+                config = replace(p1_config, video_id="video-" + sha256(video_file.getvalue()).hexdigest()[:16])
                 st.session_state.active_bundle = bundle
                 st.session_state.analysis_job = start_analysis(st.session_state.source_path, bundle, config, interactions)
             except Exception as exc:
