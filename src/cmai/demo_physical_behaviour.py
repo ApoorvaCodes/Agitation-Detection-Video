@@ -19,7 +19,7 @@ from cmai.taxonomy import validate_canonical_cmai_behaviour
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DEMO_DETECTOR = "demo_physical_behaviour_rules_v1"
+DEMO_DETECTOR = "demo_physical_behaviour_rules_v2"
 DEMO_STATUS = "DEMO_ONLY"
 SCORE_SEMANTICS = "demo_rule_evidence_strength_not_probability"
 
@@ -31,6 +31,9 @@ class DemoPhysicalBehaviourConfig:
     min_event_duration: float = .25
     max_event_duration: float = 8.0
     baseline_mad_multiplier: float = 3.0
+    limb_dominance_ratio: float = 1.5
+    min_relative_limb_displacement: float = .07
+    max_gap_seconds: float = 1.0
     hitting: dict = None
     kicking: dict = None
     pacing: dict = None
@@ -44,6 +47,8 @@ class DemoPhysicalBehaviourConfig:
 
 
 def _value(observation, name):
+    if observation.quality.feature_validity.get(name) is False:
+        return None
     value = observation.motion.feature_values.get(name) if observation.motion else None
     return float(value) if value is not None and math.isfinite(value) else None
 
@@ -54,6 +59,8 @@ def _point(observation, name):
     pose = observation.normalized_pose
     landmark = pose.landmarks.get(name) if pose else None
     if landmark is None or landmark.x is None or landmark.y is None:
+        return None
+    if any(value is not None and value < .5 for value in (landmark.visibility, landmark.presence)):
         return None
     return (float(landmark.x), float(landmark.y))
 
@@ -148,6 +155,57 @@ class DemoPhysicalBehaviourDetector:
         self.config = config or DemoPhysicalBehaviourConfig.from_path()
         self.diagnostics = {}
 
+    def _limb_motion(self, rows, event):
+        """Compare arm/leg motion in the same body-relative coordinate system.
+
+        Absolute joint speed includes movement of the anchor/body. A kick can
+        move the shoulders and hands together without being an arm strike.
+        """
+        support = {}
+        for label, joint, anchor in (("hitting", "wrist", "shoulder"),
+                                     ("kicking", "ankle", "hip")):
+            speeds = []
+            for before, after in zip(rows, rows[1:]):
+                dt = after.timestamp - before.timestamp
+                if not (0 < dt <= self.config.max_gap_seconds
+                        and event.start_timestamp <= after.timestamp <= event.end_timestamp):
+                    continue
+                for side in ("left", "right"):
+                    points = [_point(row, f"{side}_{name}")
+                              for row in (before, after) for name in (joint, anchor)]
+                    if any(point is None for point in points):
+                        continue
+                    old_joint, old_anchor, new_joint, new_anchor = points
+                    old = tuple(a - b for a, b in zip(old_joint, old_anchor))
+                    new = tuple(a - b for a, b in zip(new_joint, new_anchor))
+                    displacement = _distance(old, new)
+                    if displacement >= self.config.min_relative_limb_displacement:
+                        speeds.append(displacement / dt)
+            support[label] = max(speeds, default=0.0)
+        return support
+
+    def _resolve_actions(self, events, rows):
+        accepted = []
+        for event in events:
+            if event.behaviour not in {"cmai_07_hitting", "cmai_08_kicking"}:
+                accepted.append(event)
+                continue
+            support = self._limb_motion(rows, event)
+            own, other = (("hitting", "kicking") if event.behaviour == "cmai_07_hitting"
+                          else ("kicking", "hitting"))
+            if support[own] <= 0 or support[own] < support[other] * self.config.limb_dominance_ratio:
+                self.diagnostics.setdefault("abstentions", []).append({
+                    "behaviour": event.behaviour, "start_timestamp": event.start_timestamp,
+                    "end_timestamp": event.end_timestamp,
+                    "reason": "limb_motion_ambiguous_or_inconsistent", "relative_limb_speed": support})
+                continue
+            event.evidence["action_discrimination"] = {
+                "relative_limb_speed": support, "dominant_limb": own,
+                "required_dominance_ratio": self.config.limb_dominance_ratio,
+                "contact_status": "not_established"}
+            accepted.append(event)
+        return accepted
+
     def detect_person(self, person):
         if not self.config.enabled or not person.observations:
             return []
@@ -155,7 +213,9 @@ class DemoPhysicalBehaviourDetector:
         chunks = person.windows
         hitting = self._hitting(person.person_id, rows, chunks)
         kicking = self._kicking(person.person_id, rows, chunks)
-        specific = hitting + kicking
+        specific = self._resolve_actions(hitting + kicking, rows)
+        if hitting + kicking and not specific:
+            return []
         pacing = self._pacing(person.person_id, rows, chunks) if not specific else []
         repetitive = self._repetitive(person.person_id, rows, chunks) if not specific else []
         restlessness = self._restlessness(person.person_id, rows, chunks) if not specific and not pacing and not repetitive else []
@@ -170,6 +230,7 @@ class DemoPhysicalBehaviourDetector:
             source_person = source_people.get(person.person_id)
             if source_person is None:
                 continue
+            self.diagnostics = {}
             candidates = self.detect_person(source_person)
             # P2 events must reference P2 chunks, while the detector itself
             # evaluates the richer P1 rolling windows. Preserve the exact
@@ -182,6 +243,23 @@ class DemoPhysicalBehaviourDetector:
                     continue
             candidates = [candidate for candidate in candidates if candidate.chunk_ids]
             person.events.extend(candidates)
+            # Resolve the independent Hitting baseline too; otherwise it can
+            # reintroduce an arm label that the leg rule correctly rejected.
+            heuristic_events = [event for event in person.events
+                                if event.candidate_source == "motion_baseline"
+                                or event.candidate_status == DEMO_STATUS]
+            model_events = [event for event in person.events
+                            if event not in heuristic_events]
+            resolved = self._resolve_actions(heuristic_events, source_person.observations)
+            # The baseline and demo layer can describe the same arm stroke.
+            # Keep its baseline evidence rather than displaying duplicate rows.
+            baselines = [event for event in resolved if event.candidate_source == "motion_baseline"]
+            resolved = [event for event in resolved if event.candidate_status != DEMO_STATUS
+                        or not any(b.behaviour == event.behaviour
+                                   and b.start_timestamp < event.end_timestamp
+                                   and event.start_timestamp < b.end_timestamp for b in baselines)]
+            person.events = model_events + resolved
+            person.movement_diagnostics["action_discrimination"] = self.diagnostics
             # The independent movement baseline runs before the demo rules.
             # Resolve its broad label against specific evidence from either path.
             specific = [event for event in person.events if event.behaviour in {

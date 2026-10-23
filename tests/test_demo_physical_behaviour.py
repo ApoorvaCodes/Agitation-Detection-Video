@@ -113,3 +113,44 @@ def test_detection_is_independent_of_track_identifier_and_source_path():
     first = DemoPhysicalBehaviourDetector().detect_person(_person(rows, person_id="one"))
     second = DemoPhysicalBehaviourDetector().detect_person(_person(rows, person_id="unseen_track"))
     assert [(c.behaviour, c.start_timestamp, c.end_timestamp) for c in first] == [(c.behaviour, c.start_timestamp, c.end_timestamp) for c in second]
+
+
+def test_competing_arm_and_leg_motion_is_disambiguated_before_display():
+    """Reproduce both rules firing using motion calculated by P1, not fake speeds."""
+    from person1.features import enrich_observations, aggregate_windows
+    from person2.pipeline import process_perception
+    from person2.contracts import BehaviourEvent
+    from test_person2 import source
+
+    for expected in ('hitting', 'kicking', 'ambiguous'):
+        rows = []
+        for i in range(12):
+            peak = i == 3
+            shoulder_width = .2 if expected == 'ambiguous' else 1.
+            rest_wrist = 1.0 if expected == 'kicking' else .1 if expected == 'ambiguous' else .3
+            peak_wrist = 1.4 if expected == 'kicking' else .46 if expected == 'ambiguous' else 1.5
+            points = {'right_shoulder': (0, 0), 'left_shoulder': (shoulder_width, 0),
+                      'right_wrist': (peak_wrist if peak else rest_wrist, 0),
+                      'right_hip': (0, .2), 'right_knee': (0, .5),
+                      'right_ankle': ((0, 1.4 if expected == 'kicking' else .8)
+                                      if peak else (.2, .5))}
+            rows.append(_row(i, points=points))
+        enrich_observations(rows, 1., .001)
+        person = _person(rows, aggregate_windows(rows, 2., .5, .6), person_id='p1')
+        detector = DemoPhysicalBehaviourDetector()
+        raw = detector._hitting('p1', rows, person.windows) + detector._kicking('p1', rows, person.windows)
+        assert {e.behaviour for e in raw} == {'cmai_07_hitting', 'cmai_08_kicking'}
+        data = source(rows)
+        data.persons = [person]
+        result = process_perception(data)
+        # The independent baseline must not reintroduce the wrong arm label.
+        if not any(e.behaviour == 'cmai_07_hitting' for e in result.persons[0].events):
+            result.persons[0].events.append(BehaviourEvent(
+                behaviour='cmai_07_hitting', start_timestamp=.6, end_timestamp=.8,
+                peak_similarity=.9, chunk_ids=[result.persons[0].chunks[0].chunk_id],
+                candidate_source='motion_baseline', arm_side='right', candidate_score=.9))
+        detector.detect(result, data)
+        labels = [e.behaviour for e in result.persons[0].events]
+        assert labels == ([] if expected == 'ambiguous' else
+                          ['cmai_07_hitting' if expected == 'hitting' else 'cmai_08_kicking'])
+        assert result.model_validate_json(result.model_dump_json()).model_dump(mode="json") == result.model_dump(mode="json")

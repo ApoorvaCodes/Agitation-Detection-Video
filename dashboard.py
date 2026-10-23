@@ -215,7 +215,7 @@ def render_camera_result(p1, p2, bundle):
     if selected_person is not None:
         track_p2 = next((p for p in p2.persons if p.person_id == selected_person), None)
         if track_p2:
-            with st.expander("Pacing and Restlessness diagnostics"):
+            with st.expander("Behaviour detection diagnostics"):
                 st.caption("Experimental movement-pattern candidates are not clinical conclusions. Missing pose or track coverage is reported as abstention evidence.")
                 st.json(track_p2.movement_diagnostics)
         coverage = next(c for c in result.coverage if c.person_id == selected_person)

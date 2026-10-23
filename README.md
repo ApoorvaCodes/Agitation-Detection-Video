@@ -57,6 +57,12 @@ kicking-like, pacing, repetitive-mannerism, or restlessness candidates from P1
 motion evidence. Candidates are visibly marked `DEMO_ONLY`; evidence strength
 is not confidence, and no clinical CMAI claim is made. The rules abstain when
 the measured evidence is insufficient and do not key on filenames or track IDs.
+The v2 rules compare wrist motion relative to the shoulder against ankle motion
+relative to the hip. Similar arm/leg support abstains rather than emitting
+conflicting hitting/kicking labels; diagnostics record rejected action candidates.
+The dominance ratio and minimum displacement are configurable engineering
+defaults, pending evaluation on labelled videos. Reanalyse videos after updates;
+previously saved results retain their original detections.
 
 The app automatically loads `configs/cmai_detector_bundle.json`, or a local
 bundle selected through `CMAI_DETECTOR_BUNDLE`. No evaluated behaviour assets are
