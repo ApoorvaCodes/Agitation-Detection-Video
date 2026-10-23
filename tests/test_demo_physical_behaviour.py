@@ -154,3 +154,27 @@ def test_competing_arm_and_leg_motion_is_disambiguated_before_display():
         assert labels == ([] if expected == 'ambiguous' else
                           ['cmai_07_hitting' if expected == 'hitting' else 'cmai_08_kicking'])
         assert result.model_validate_json(result.model_dump_json()).model_dump(mode="json") == result.model_dump(mode="json")
+
+
+def test_single_action_is_not_vetoed_by_unqualified_other_limb_motion():
+    # The other limb moves faster but fails its own action rule. This must not
+    # erase an independently supported hit or kick (the v2 zero-result regression).
+    for label in ('cmai_07_hitting', 'cmai_08_kicking'):
+        rows = []
+        for i in range(6):
+            high = i in (1, 2, 3)
+            hitting = label == 'cmai_07_hitting'
+            joint = 'wrist' if hitting else 'ankle'
+            features = {f'right_{joint}.velocity.speed': 4 if high else 0,
+                        f'right_{joint}.acceleration.magnitude': 5 if high else 0}
+            if not hitting:
+                features['right_knee.angular_velocity'] = 1000 if high else 0
+            rows.append(_row(i, features=features, points={
+                'right_shoulder': (.2, .5), 'left_shoulder': (0, .5),
+                'right_wrist': ((.5 if hitting else 1.5) if high else .25, .5),
+                'right_hip': (.2, .2), 'right_knee': (.2, .5),
+                'right_ankle': (.2, (.9 if not hitting else 2.) if high else .8)}))
+        detector = _detector()
+        assert [e.behaviour for e in detector.detect_person(_person(rows))] == [label]
+        assert detector.diagnostics['hitting']['rule_candidates'] == int(hitting)
+        assert detector.diagnostics['kicking']['rule_candidates'] == int(not hitting)

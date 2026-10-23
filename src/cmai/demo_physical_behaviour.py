@@ -190,6 +190,16 @@ class DemoPhysicalBehaviourDetector:
             if event.behaviour not in {"cmai_07_hitting", "cmai_08_kicking"}:
                 accepted.append(event)
                 continue
+            competing = [other for other in events
+                         if other.behaviour in {"cmai_07_hitting", "cmai_08_kicking"}
+                         and other.behaviour != event.behaviour
+                         and other.start_timestamp < event.end_timestamp
+                         and event.start_timestamp < other.end_timestamp]
+            # Discrimination resolves a label conflict, not every movement of
+            # the other limb. Preserve independently supported single actions.
+            if not competing:
+                accepted.append(event)
+                continue
             support = self._limb_motion(rows, event)
             own, other = (("hitting", "kicking") if event.behaviour == "cmai_07_hitting"
                           else ("kicking", "hitting"))
@@ -206,14 +216,15 @@ class DemoPhysicalBehaviourDetector:
             accepted.append(event)
         return accepted
 
-    def detect_person(self, person):
+    def detect_person(self, person, *, resolve_actions=True):
         if not self.config.enabled or not person.observations:
             return []
         rows = person.observations
         chunks = person.windows
         hitting = self._hitting(person.person_id, rows, chunks)
         kicking = self._kicking(person.person_id, rows, chunks)
-        specific = self._resolve_actions(hitting + kicking, rows)
+        specific = (self._resolve_actions(hitting + kicking, rows)
+                    if resolve_actions else hitting + kicking)
         if hitting + kicking and not specific:
             return []
         pacing = self._pacing(person.person_id, rows, chunks) if not specific else []
@@ -231,7 +242,12 @@ class DemoPhysicalBehaviourDetector:
             if source_person is None:
                 continue
             self.diagnostics = {}
-            candidates = self.detect_person(source_person)
+            # Resolve once, after combining both heuristic paths. Resolving the
+            # demo first could discard a kick and leave a baseline hit unopposed.
+            candidates = self.detect_person(source_person, resolve_actions=False)
+            self.diagnostics["raw_action_candidates"] = sum(
+                e.behaviour in {"cmai_07_hitting", "cmai_08_kicking"}
+                for e in person.events + candidates)
             # P2 events must reference P2 chunks, while the detector itself
             # evaluates the richer P1 rolling windows. Preserve the exact
             # source interval and attach only overlapping P2 chunk IDs.
@@ -259,6 +275,11 @@ class DemoPhysicalBehaviourDetector:
                                    and b.start_timestamp < event.end_timestamp
                                    and event.start_timestamp < b.end_timestamp for b in baselines)]
             person.events = model_events + resolved
+            self.diagnostics["accepted_action_candidates"] = sum(
+                e.behaviour in {"cmai_07_hitting", "cmai_08_kicking"} for e in resolved)
+            self.diagnostics["pose_detected_observations"] = sum(
+                o.quality.pose_detected and not o.quality.bbox_interpolated
+                for o in source_person.observations)
             person.movement_diagnostics["action_discrimination"] = self.diagnostics
             # The independent movement baseline runs before the demo rules.
             # Resolve its broad label against specific evidence from either path.
@@ -287,6 +308,7 @@ class DemoPhysicalBehaviourDetector:
         speed_cut = max(float(cfg["speed_floor"]), speed_baseline * float(cfg["speed_baseline_multiplier"]))
         acceleration_cut = max(float(cfg["acceleration_floor"]), acceleration_baseline * float(cfg["acceleration_baseline_multiplier"]))
         flags, evidence = [], []
+        gates = dict.fromkeys(("speed", "acceleration", "visible_arm_extension", "return"), 0)
         for i, row in enumerate(rows):
             sides = []
             for side in ("left", "right"):
@@ -306,6 +328,10 @@ class DemoPhysicalBehaviourDetector:
                     return_seen |= (speed is not None and later_speed is not None and later_speed <= speed * float(cfg["return_speed_ratio"])) or (extension is not None and later_extension is not None and later_extension <= extension * float(cfg["return_extension_ratio"]))
                 if speed is not None and acceleration is not None and extension is not None and speed >= speed_cut and acceleration >= acceleration_cut and extension >= float(cfg["extension_threshold"]) and return_seen:
                     sides.append((side, speed, acceleration, extension))
+                gates["speed"] += int(speed is not None and speed >= speed_cut)
+                gates["acceleration"] += int(acceleration is not None and acceleration >= acceleration_cut)
+                gates["visible_arm_extension"] += int(extension is not None and extension >= float(cfg["extension_threshold"]))
+                gates["return"] += int(return_seen)
             flags.append(bool(sides))
             if sides:
                 evidence.append((row, sides))
@@ -325,6 +351,11 @@ class DemoPhysicalBehaviourDetector:
                     "features": {"wrist": values, "contact_status": "not_established"},
                     "valid_fraction": _valid_fraction(group), "status": DEMO_STATUS,
                 }, _strength(group, ["left_wrist.velocity.speed", "right_wrist.velocity.speed"])))
+        self.diagnostics["hitting"] = {
+            "speed_threshold": speed_cut, "acceleration_threshold": acceleration_cut,
+            "max_measured_speed": max((v for v in speeds if v is not None), default=None),
+            "limb_observations_passing_each_gate": gates,
+            "observations_passing_all_gates": sum(flags), "rule_candidates": len(out)}
         return out
 
     def _kicking(self, person_id, rows, chunks):
@@ -337,6 +368,7 @@ class DemoPhysicalBehaviourDetector:
         speed_cut = max(float(cfg["speed_floor"]), speed_baseline * float(cfg["speed_baseline_multiplier"]))
         acceleration_cut = max(float(cfg["acceleration_floor"]), acceleration_baseline * float(cfg["acceleration_baseline_multiplier"]))
         flags, details = [], []
+        gates = dict.fromkeys(("speed", "acceleration", "knee_extension_speed", "visible_knee_angle", "return"), 0)
         for i, row in enumerate(rows):
             legs = []
             for side in ("left", "right"):
@@ -357,6 +389,11 @@ class DemoPhysicalBehaviourDetector:
                     for later in rows[i + 1:]))
                 if speed is not None and acceleration is not None and angle is not None and speed >= speed_cut and acceleration >= acceleration_cut and angular_velocity >= float(cfg["knee_angular_velocity_floor"]) and angle >= float(cfg["knee_angle_threshold"]) and return_seen:
                     legs.append((side, speed, acceleration, angle))
+                gates["speed"] += int(speed is not None and speed >= speed_cut)
+                gates["acceleration"] += int(acceleration is not None and acceleration >= acceleration_cut)
+                gates["knee_extension_speed"] += int(angular_velocity >= float(cfg["knee_angular_velocity_floor"]))
+                gates["visible_knee_angle"] += int(angle is not None and angle >= float(cfg["knee_angle_threshold"]))
+                gates["return"] += int(return_seen)
             flags.append(bool(legs))
             if legs:
                 details.append((row, legs))
@@ -374,6 +411,12 @@ class DemoPhysicalBehaviourDetector:
                     "features": {"ankle_knee": [item for row, item in details if row in group]},
                     "valid_fraction": _valid_fraction(group), "status": DEMO_STATUS,
                 }, _strength(group, ["left_ankle.velocity.speed", "right_ankle.velocity.speed"])))
+        self.diagnostics["kicking"] = {
+            "speed_threshold": speed_cut, "acceleration_threshold": acceleration_cut,
+            "knee_angular_velocity_threshold": cfg["knee_angular_velocity_floor"],
+            "max_measured_speed": max((v for v in speeds if v is not None), default=None),
+            "limb_observations_passing_each_gate": gates,
+            "observations_passing_all_gates": sum(flags), "rule_candidates": len(out)}
         return out
 
     def _pacing(self, person_id, rows, chunks):

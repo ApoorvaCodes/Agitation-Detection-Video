@@ -58,8 +58,11 @@ motion evidence. Candidates are visibly marked `DEMO_ONLY`; evidence strength
 is not confidence, and no clinical CMAI claim is made. The rules abstain when
 the measured evidence is insufficient and do not key on filenames or track IDs.
 The v2 rules compare wrist motion relative to the shoulder against ankle motion
-relative to the hip. Similar arm/leg support abstains rather than emitting
-conflicting hitting/kicking labels; diagnostics record rejected action candidates.
+relative to the hip when both action rules produce overlapping candidates.
+Similar support in that conflict abstains rather than emitting conflicting
+labels. Single-action candidates retain their original evidence gates; ordinary
+movement of the other limb does not veto them. Diagnostics record per-rule
+thresholds, gate counts and rejected action candidates, including zero-result runs.
 The dominance ratio and minimum displacement are configurable engineering
 defaults, pending evaluation on labelled videos. Reanalyse videos after updates;
 previously saved results retain their original detections.
